@@ -66,6 +66,9 @@ pub enum Cmd {
         /// Only this probe type: dns | tcp | http | icmp
         #[arg(long = "type")]
         probe_type: Option<String>,
+        /// Machine-readable JSON output instead of the table
+        #[arg(long)]
+        json: bool,
     },
     /// Show the effective configuration (resolved file + built-in defaults)
     Config,

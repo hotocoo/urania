@@ -199,6 +199,19 @@ async fn daemon_roundtrip_local_dummies() {
     );
     assert!(String::from_utf8_lossy(&once.stdout).contains("tcp-local"));
 
+    // once --json: machine-readable output, structurally valid.
+    let once_json = std::process::Command::new(bin)
+        .args(["once", "--json", "--target", "tcp-local", "--config"])
+        .arg(&cfg_path)
+        .output()
+        .unwrap();
+    let out = String::from_utf8_lossy(&once_json.stdout);
+    assert!(once_json.status.success(), "once --json failed: {out}");
+    assert!(out.starts_with("{\"ts\":"), "not JSON: {out}");
+    assert!(out.contains("\"all_ok\":true"));
+    assert!(out.contains("\"target\":\"tcp-local\""));
+    assert!(out.contains("\"ok\":true"));
+
     tcp_task.abort();
     http_task.abort();
     let _ = std::fs::remove_dir_all(&dir);

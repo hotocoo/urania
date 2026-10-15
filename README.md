@@ -69,6 +69,7 @@ urania status           # daemon, db, per-target last probe + 1h availability, o
 urania status --check   # scripts: print state, exit 0 = running, 1 = not running
 urania once             # one probe round, table output, exit 0/1
 urania once --type tcp  # only TCP targets
+urania once --json      # machine-readable output for scripts
 urania report --since 24h --to report.html
 urania report --since 30d --to report.html --csv report.csv --manifest
 urania verify report.html   # check the report against report.html.sha256

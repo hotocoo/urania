@@ -68,6 +68,9 @@ All notable changes to urania are documented here.
 - Report: the summary table gains an Observed column (first → last
   probe per target in the period) — states when the logger was
   actually observing each target, next to the coverage percentage.
+- CLI: `urania once --json` — machine-readable one-shot output
+  (ts, all_ok, per-target ok/latency/detail) for scripts; the
+  table output is unchanged.
 - Config: fail-fast validation for an empty target list, whitespace-only
   target names, and ICMP endpoints containing whitespace (previously
   accepted, then logged silence or failed obscurely at probe time).

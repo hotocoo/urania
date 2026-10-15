@@ -189,9 +189,11 @@ async fn run(cli: cli::Cli) -> i32 {
             }
             0
         }
-        cli::Cmd::Once { target, probe_type } => {
-            once(&cfg, target.as_deref(), probe_type.as_deref()).await
-        }
+        cli::Cmd::Once {
+            target,
+            probe_type,
+            json,
+        } => once(&cfg, target.as_deref(), probe_type.as_deref(), *json).await,
         cli::Cmd::Selftest => match selftest::run().await {
             Ok(code) => code,
             Err(e) => {
@@ -203,7 +205,12 @@ async fn run(cli: cli::Cli) -> i32 {
 }
 
 /// One probe round, table output, exit 0 = all ok / 1 = any failed.
-async fn once(cfg: &config::Config, target: Option<&str>, probe_type: Option<&str>) -> i32 {
+async fn once(
+    cfg: &config::Config,
+    target: Option<&str>,
+    probe_type: Option<&str>,
+    json: bool,
+) -> i32 {
     let pt = match probe_type {
         Some(s) => match s {
             "dns" => Some(config::ProbeType::Dns),
@@ -240,27 +247,73 @@ async fn once(cfg: &config::Config, target: Option<&str>, probe_type: Option<&st
         return 1;
     }
     let results = probe::run_round(&probes).await;
-    println!(
-        "{:<18} {:<6} {:<7} {:>9}  DETAIL",
-        "TARGET", "TYPE", "RESULT", "LATENCY"
-    );
     let mut any_fail = false;
     for r in &results {
         if !r.ok {
             any_fail = true;
         }
-        let lat = r
-            .latency_ms
-            .map(|l| format!("{l:.1}ms"))
-            .unwrap_or_else(|| "-".into());
+    }
+    if json {
+        // Flat JSON for scripting. Hand-rolled (no serde_json dep): the
+        // only free-form fields are target names and detail strings,
+        // both controlled by urania.
+        let ts = results
+            .first()
+            .map(|r| r.ts_wall_ms)
+            .unwrap_or_else(crate::util::now_ms);
+        let items: Vec<String> = results
+            .iter()
+            .map(|r| {
+                let mut s = format!(
+                    "{{\"target\":\"{}\",\"type\":\"{}\",\"ok\":{}",
+                    json_escape(&r.target),
+                    r.probe_type,
+                    r.ok
+                );
+                if let Some(l) = r.latency_ms {
+                    s.push_str(&format!(",\"latency_ms\":{l:.1}"));
+                }
+                if !r.detail.is_empty() {
+                    s.push_str(&format!(",\"detail\":\"{}\"", json_escape(&r.detail)));
+                }
+                s.push('}');
+                s
+            })
+            .collect();
         println!(
-            "{:<18} {:<6} {:<7} {:>9}  {}",
-            r.target,
-            r.probe_type,
-            if r.ok { "ok" } else { "FAIL" },
-            lat,
-            r.detail
+            "{{\"ts\":{ts},\"all_ok\":{},\"results\":[{}]}}",
+            !any_fail,
+            items.join(",")
         );
+    } else {
+        println!(
+            "{:<18} {:<6} {:<7} {:>9}  DETAIL",
+            "TARGET", "TYPE", "RESULT", "LATENCY"
+        );
+        for r in &results {
+            let lat = r
+                .latency_ms
+                .map(|l| format!("{l:.1}ms"))
+                .unwrap_or_else(|| "-".into());
+            println!(
+                "{:<18} {:<6} {:<7} {:>9}  {}",
+                r.target,
+                r.probe_type,
+                if r.ok { "ok" } else { "FAIL" },
+                lat,
+                r.detail
+            );
+        }
     }
     if any_fail { 1 } else { 0 }
+}
+
+/// Minimal JSON string escaping for the controlled free-form fields
+/// (target names, probe detail strings).
+fn json_escape(s: &str) -> String {
+    s.replace('\\', "\\\\")
+        .replace('"', "\\\"")
+        .replace('\n', "\\n")
+        .replace('\r', "\\r")
+        .replace('\t', "\\t")
 }
