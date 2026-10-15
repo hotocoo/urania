@@ -196,6 +196,29 @@ pub fn render_html(ctx: &HtmlCtx) -> String {
     ));
     s.push_str("</dl>\n</header>\n");
 
+    // Period summary — the 10-second read for a ticket reviewer
+    s.push_str("<section>\n<h2>Period summary</h2>\n");
+    s.push_str("<table>\n<tr><th>Target</th><th>Probes</th><th>OK</th><th>Failed</th><th>Availability</th><th>Outages</th></tr>\n");
+    for (info, td) in ctx.targets.iter().zip(ctx.data.iter()) {
+        let ok = td.rows.iter().filter(|r| r.ok).count();
+        let failed = td.rows.len() - ok;
+        let avail = if td.rows.is_empty() {
+            "—".to_string()
+        } else if info.reference_only {
+            "ref-only".to_string()
+        } else {
+            format!("{:.2}%", availability_pct(&td.rows))
+        };
+        let outages = ctx.outages.iter().filter(|w| w.target == td.name).count();
+        s.push_str(&format!(
+            "<tr><td>{} <code>{}</code></td><td>{}</td><td>{ok}</td><td>{failed}</td><td>{avail}</td><td>{outages}</td></tr>\n",
+            esc(&td.name),
+            esc(&target_line(info)),
+            td.rows.len()
+        ));
+    }
+    s.push_str("</table>\n</section>\n");
+
     // Per-target sections
     for (info, td) in ctx.targets.iter().zip(ctx.data.iter()) {
         s.push_str("<section>\n<h2>");
@@ -410,5 +433,63 @@ mod tests {
         assert_eq!(drift_count(&rows, 5000), 0);
         rows[5].ts_mono_delta_ms = Some(9000); // +80%
         assert_eq!(drift_count(&rows, 5000), 1);
+    }
+
+    #[test]
+    fn period_summary_table_counts() {
+        // 10 probes, 2 failed (i==3, i==7) → 80.00% availability, 1 outage.
+        let rows: Vec<ProbeRow> = (0..10)
+            .map(|i| row("dns-cloudflare", i * 5000, i != 3 && i != 7, Some(10.0)))
+            .collect();
+        let outages = vec![ORow {
+            start_ts: 15_000,
+            end_ts: Some(25_000),
+            target: "dns-cloudflare".into(),
+            layers: "dns".into(),
+            cause: None,
+            location_class: None,
+            flap: false,
+        }];
+        let html = render_html(&ctx_with(rows, outages));
+        assert!(html.contains("Period summary"));
+        let row_line = html
+            .lines()
+            .find(|l| l.contains("dns-cloudflare") && l.contains("<td>10</td>"))
+            .expect("summary row");
+        assert!(row_line.contains("80.00%"));
+        assert!(row_line.contains("<td>10</td><td>8</td><td>2</td>"));
+        assert!(row_line.ends_with("<td>1</td></tr>"));
+    }
+
+    #[test]
+    fn period_summary_empty_target_and_reference_only() {
+        let mut ctx = ctx_with(vec![], vec![]);
+        // second target: reference-only gateway, 5 failed probes
+        ctx.targets.push(TargetInfo {
+            name: "gateway".into(),
+            probe_type: ProbeType::Tcp,
+            endpoint: "auto:443,80".into(),
+            interval: 5,
+            reference_only: true,
+        });
+        ctx.data.push(TargetData {
+            name: "gateway".into(),
+            rows: (0..5)
+                .map(|i| row("gateway", i * 5000, false, None))
+                .collect(),
+        });
+        let html = render_html(&ctx);
+        let lines: Vec<&str> = html.lines().collect();
+        let empty = lines
+            .iter()
+            .find(|l| l.contains("dns-cloudflare") && l.contains("<td>0</td>"))
+            .expect("empty target row");
+        assert!(empty.contains("<td>—</td>"));
+        let ref_only = lines
+            .iter()
+            .find(|l| l.contains("gateway") && l.contains("<td>5</td>"))
+            .expect("reference-only row");
+        assert!(ref_only.contains("ref-only"));
+        assert!(!ref_only.contains("%</td>"));
     }
 }

@@ -29,6 +29,10 @@ All notable changes to urania are documented here.
   two) and partitions rows into targets in one pass (previously a
   filter+clone per target); output is byte-identical for a given DB
   snapshot (verified by old-vs-new diff).
+- Report: period-summary table at the top (per-target probes / OK / failed /
+  availability / outage count) — the 10-second read for a ticket reviewer.
+  Reference-only gateways show `ref-only` instead of an availability
+  percentage; targets with no data in the period show `—`.
 - Daemon: single-instance flock + pidfile (no stale-lock states), graceful
   SIGTERM stop, daily log rotation (keep 2), `start|stop|status|once|report|verify|selftest`;
   `start` polls for the pidfile up to 5 s instead of one fixed 500 ms wait,

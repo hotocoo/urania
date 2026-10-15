@@ -82,7 +82,8 @@ or missing file, 2 = unreadable/malformed manifest.
 
 Self-contained HTML: zero JavaScript, zero external requests, inline SVG
 sparklines. Sections: header (period, host, targets with resolver provenance,
-clock note, retention), per-target availability + latency + sparkline (red
+clock note, retention), period summary (per-target probes / OK / failed /
+availability / outages), per-target availability + latency + sparkline (red
 bars = failed buckets), outage table (start, duration, layers, cause,
 location, flap), footer (generator + optional SHA-256 manifest name).
 
