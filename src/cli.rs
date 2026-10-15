@@ -63,6 +63,8 @@ pub enum Cmd {
         #[arg(long = "type")]
         probe_type: Option<String>,
     },
+    /// Show the effective configuration (resolved file + built-in defaults)
+    Config,
     /// Round-trip self-test against known-good targets
     Selftest,
     /// Hidden: the real daemon loop (systemd / Docker)

@@ -71,6 +71,7 @@ urania once --type tcp  # only TCP targets
 urania report --since 24h --to report.html
 urania report --since 30d --to report.html --csv report.csv --manifest
 urania verify report.html   # check the report against report.html.sha256
+urania config           # show the effective config (file + resolved paths + targets)
 urania selftest         # round-trip check against known-good targets
 ```
 
@@ -103,7 +104,10 @@ location, flap), footer (generator + optional SHA-256 manifest name).
 
 `~/.config/urania/config.toml` (create it to override; missing file =
 built-in defaults). Data: `~/.local/share/urania/` (Linux) or
-`~/Library/Application Support/urania/` (macOS).
+`~/Library/Application Support/urania/` (macOS). Each key in the file
+overrides the default independently — but a file that contains any
+`[[target]]` entries uses exactly those targets (the built-in seven are
+not merged in). `urania config` shows the effective configuration.
 
 ```toml
 fail_threshold = 3     # consecutive failures that open an outage window

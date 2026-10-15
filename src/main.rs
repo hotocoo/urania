@@ -157,6 +157,37 @@ async fn run(cli: cli::Cli) -> i32 {
                 }
             }
         }
+        cli::Cmd::Config => {
+            // Where the config came from: explicit --config, the default
+            // path if present, else built-in defaults.
+            let source = match &cli.config {
+                Some(p) => p.display().to_string(),
+                None => {
+                    let d = config::config_path();
+                    if d.exists() {
+                        d.display().to_string()
+                    } else {
+                        "built-in defaults (no config file)".to_string()
+                    }
+                }
+            };
+            println!("urania v{}", env!("CARGO_PKG_VERSION"));
+            println!("  config:    {source}");
+            println!("  db:        {}", config::db_path(&cfg).display());
+            println!("  log:       {}/", config::log_dir(&cfg).display());
+            println!("  lock:      {}", config::lock_path(&cfg).display());
+            println!("  fail_threshold: {}", cfg.fail_threshold);
+            println!("  retention_days:   {}", cfg.retention_days);
+            println!("  icmp:      {}", cfg.icmp);
+            println!("  targets ({}):", cfg.targets.len());
+            for t in &cfg.targets {
+                println!(
+                    "    {:<16} {:<5} {:<44} {}s  timeout {}s",
+                    t.name, t.probe_type, t.endpoint, t.interval, t.timeout
+                );
+            }
+            0
+        }
         cli::Cmd::Once { target, probe_type } => {
             once(&cfg, target.as_deref(), probe_type.as_deref()).await
         }

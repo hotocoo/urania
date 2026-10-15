@@ -43,6 +43,11 @@ All notable changes to urania are documented here.
   builder and BuildKit. Verified: image builds, `selftest` passes in
   the container, the binary is statically linked, a live probe round
   succeeds, and the database + log persist to the mounted volume.
+- CLI: new `urania config` — prints the effective configuration
+  (source file or built-in defaults, resolved db/log/lock paths,
+  thresholds, and every target with type/endpoint/interval/timeout).
+  README documents the override semantics: a config file with any
+  `[[target]]` entries replaces the built-in targets, it does not merge.
 - Daemon: single-instance flock + pidfile (no stale-lock states), graceful
   SIGTERM stop, daily log rotation (keep 2), `start|stop|status|once|report|verify|selftest`;
   `start` polls for the pidfile up to 5 s instead of one fixed 500 ms wait,
