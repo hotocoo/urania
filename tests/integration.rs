@@ -311,6 +311,19 @@ async fn daemon_roundtrip_local_dummies() {
         "tcp-local with interval: {cout}"
     );
 
+    // once --quiet: silent on success (exit code only).
+    let once_q = std::process::Command::new(bin)
+        .args(["once", "--quiet", "--target", "tcp-local", "--config"])
+        .arg(&cfg_path)
+        .output()
+        .unwrap();
+    assert!(once_q.status.success(), "once --quiet should exit 0");
+    assert!(
+        once_q.stdout.is_empty(),
+        "once --quiet should be silent: {}",
+        String::from_utf8_lossy(&once_q.stdout)
+    );
+
     // report --since + --from: mutually exclusive, explicit error.
     let conflict = std::process::Command::new(bin)
         .args([

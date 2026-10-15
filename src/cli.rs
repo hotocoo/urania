@@ -83,6 +83,10 @@ pub enum Cmd {
         /// Machine-readable JSON output instead of the table
         #[arg(long)]
         json: bool,
+        /// Silent on success (exit code only); failures still print
+        /// (the exit code says what, the output says which)
+        #[arg(long)]
+        quiet: bool,
     },
     /// Show the effective configuration (resolved file + built-in defaults)
     Config {

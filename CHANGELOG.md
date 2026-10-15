@@ -113,6 +113,9 @@ All notable changes to urania are documented here.
   exclusive with an explicit error (previously --from silently
   won, which could change the evidence window without the
   user noticing). --since is now optional (default 24h).
+- CLI: `once --quiet` — silent on success (exit code
+  only); failures still print (the exit code says what,
+  the output says which).
 - Config: fail-fast validation for an empty target list, whitespace-only
   target names, and ICMP endpoints containing whitespace (previously
   accepted, then logged silence or failed obscurely at probe time).

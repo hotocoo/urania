@@ -80,6 +80,7 @@ urania status --json    # machine-readable status for monitoring (same exit code
 urania once             # one probe round, table output, exit 0/1
 urania once --type tcp  # only TCP targets
 urania once --json      # machine-readable output for scripts
+urania once --quiet     # silent on success (exit code only); failures still print
 urania config --json    # machine-readable effective config (auditing, CMDB)
 urania report --since 24h --to report.html
 urania report --since 30d --to report.html --csv report.csv --manifest

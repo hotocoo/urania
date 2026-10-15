@@ -273,7 +273,17 @@ async fn run(cli: cli::Cli) -> i32 {
             target,
             probe_type,
             json,
-        } => once(&cfg, target.as_deref(), probe_type.as_deref(), *json).await,
+            quiet,
+        } => {
+            once(
+                &cfg,
+                target.as_deref(),
+                probe_type.as_deref(),
+                *json,
+                *quiet,
+            )
+            .await
+        }
         cli::Cmd::Selftest => match selftest::run().await {
             Ok(code) => code,
             Err(e) => {
@@ -285,11 +295,13 @@ async fn run(cli: cli::Cli) -> i32 {
 }
 
 /// One probe round, table output, exit 0 = all ok / 1 = any failed.
+/// `quiet`: silent on success (exit code only); failures still print.
 async fn once(
     cfg: &config::Config,
     target: Option<&str>,
     probe_type: Option<&str>,
     json: bool,
+    quiet: bool,
 ) -> i32 {
     let pt = match probe_type {
         Some(s) => match s {
@@ -333,52 +345,56 @@ async fn once(
             any_fail = true;
         }
     }
-    if json {
-        // Flat JSON for scripting (serde_json: already in the tree via
-        // reqwest, now a direct dep for the machine-readable outputs).
-        let ts = results
-            .first()
-            .map(|r| r.ts_wall_ms)
-            .unwrap_or_else(crate::util::now_ms);
-        let items: Vec<serde_json::Value> = results
-            .iter()
-            .map(|r| {
-                let mut o = serde_json::json!({
-                    "target": r.target,
-                    "type": r.probe_type.to_string(),
-                    "ok": r.ok,
-                });
-                if let Some(l) = r.latency_ms {
-                    o["latency_ms"] = serde_json::json!(l);
-                }
-                if !r.detail.is_empty() {
-                    o["detail"] = serde_json::json!(r.detail);
-                }
-                o
-            })
-            .collect();
-        println!(
-            "{}",
-            serde_json::json!({ "ts": ts, "all_ok": !any_fail, "results": items })
-        );
-    } else {
-        println!(
-            "{:<18} {:<6} {:<7} {:>9}  DETAIL",
-            "TARGET", "TYPE", "RESULT", "LATENCY"
-        );
-        for r in &results {
-            let lat = r
-                .latency_ms
-                .map(|l| format!("{l:.1}ms"))
-                .unwrap_or_else(|| "-".into());
+    // quiet: silent on success (exit code only). Failures still print —
+    // the exit code says *what*, the output says *which*.
+    if !quiet || any_fail {
+        if json {
+            // Flat JSON for scripting (serde_json: already in the tree via
+            // reqwest, now a direct dep for the machine-readable outputs).
+            let ts = results
+                .first()
+                .map(|r| r.ts_wall_ms)
+                .unwrap_or_else(crate::util::now_ms);
+            let items: Vec<serde_json::Value> = results
+                .iter()
+                .map(|r| {
+                    let mut o = serde_json::json!({
+                        "target": r.target,
+                        "type": r.probe_type.to_string(),
+                        "ok": r.ok,
+                    });
+                    if let Some(l) = r.latency_ms {
+                        o["latency_ms"] = serde_json::json!(l);
+                    }
+                    if !r.detail.is_empty() {
+                        o["detail"] = serde_json::json!(r.detail);
+                    }
+                    o
+                })
+                .collect();
             println!(
-                "{:<18} {:<6} {:<7} {:>9}  {}",
-                r.target,
-                r.probe_type,
-                if r.ok { "ok" } else { "FAIL" },
-                lat,
-                r.detail
+                "{}",
+                serde_json::json!({ "ts": ts, "all_ok": !any_fail, "results": items })
             );
+        } else {
+            println!(
+                "{:<18} {:<6} {:<7} {:>9}  DETAIL",
+                "TARGET", "TYPE", "RESULT", "LATENCY"
+            );
+            for r in &results {
+                let lat = r
+                    .latency_ms
+                    .map(|l| format!("{l:.1}ms"))
+                    .unwrap_or_else(|| "-".into());
+                println!(
+                    "{:<18} {:<6} {:<7} {:>9}  {}",
+                    r.target,
+                    r.probe_type,
+                    if r.ok { "ok" } else { "FAIL" },
+                    lat,
+                    r.detail
+                );
+            }
         }
     }
     if any_fail { 1 } else { 0 }
