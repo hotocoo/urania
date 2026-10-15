@@ -35,6 +35,14 @@ All notable changes to urania are documented here.
   percentage; targets with no data in the period show `—`.
 - Report: new `--since 1h` period, for "what happened in the last hour"
   reports that pair with the `status` 1h availability column.
+- Docker: the scratch image now sets `HOME=/root`, so the documented
+  volume mount at `/root/.local/share/urania` is actually used (with
+  HOME unset the data dir fell back to a CWD-relative path and the
+  volume was silently unused). The Dockerfile no longer relies on
+  BuildKit-only `$BUILDPLATFORM` — it builds with both the legacy
+  builder and BuildKit. Verified: image builds, `selftest` passes in
+  the container, the binary is statically linked, a live probe round
+  succeeds, and the database + log persist to the mounted volume.
 - Daemon: single-instance flock + pidfile (no stale-lock states), graceful
   SIGTERM stop, daily log rotation (keep 2), `start|stop|status|once|report|verify|selftest`;
   `start` polls for the pidfile up to 5 s instead of one fixed 500 ms wait,
