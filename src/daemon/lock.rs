@@ -33,6 +33,8 @@ impl PidLock {
             .read(true)
             .write(true)
             .create(true)
+            // Deliberate: the old contents stay until we own the lock.
+            .truncate(false)
             .open(path)?;
         if let Err(e) = file.try_lock_exclusive() {
             let pid = peek(path);
