@@ -259,6 +259,22 @@ impl Store {
         Ok(n)
     }
 
+    /// (ok, total) probe counts for a target since `from_ms`; None if no rows
+    /// (SQLite aggregate queries return a (0,0) row for an empty set).
+    pub fn probe_counts_since(
+        &self,
+        target: &str,
+        from_ms: i64,
+    ) -> anyhow::Result<Option<(i64, i64)>> {
+        let r: (i64, i64) = self.conn.query_row(
+            "SELECT COALESCE(SUM(ok), 0), COUNT(*) FROM probes
+             WHERE target = ?1 AND ts >= ?2",
+            params![target, from_ms],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )?;
+        Ok(if r.1 > 0 { Some(r) } else { None })
+    }
+
     /// Delete data older than the retention window. Returns pruned probe rows.
     pub fn prune(&self, retention_days: u32) -> anyhow::Result<u32> {
         retention::prune(&self.conn, retention_days)
@@ -292,5 +308,23 @@ mod tests {
         store.insert_probes(&[res("gw", true, 2_000)]).unwrap();
         assert!(store.ever_ok("gw").unwrap(), "one ok is enough");
         assert!(!store.ever_ok("other").unwrap());
+    }
+
+    #[test]
+    fn probe_counts_since_respects_target_and_window() {
+        let mut store = Store::open_in_memory().unwrap();
+        store
+            .insert_probes(&[
+                res("a", true, 1_000),
+                res("a", false, 2_000),
+                res("a", true, 5_000),
+                res("b", false, 5_000),
+            ])
+            .unwrap();
+        assert_eq!(store.probe_counts_since("a", 0).unwrap(), Some((2, 3)));
+        assert_eq!(store.probe_counts_since("a", 4_000).unwrap(), Some((1, 1)));
+        assert_eq!(store.probe_counts_since("b", 4_000).unwrap(), Some((0, 1)));
+        assert_eq!(store.probe_counts_since("a", 10_000).unwrap(), None);
+        assert_eq!(store.probe_counts_since("missing", 0).unwrap(), None);
     }
 }

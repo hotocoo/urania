@@ -65,7 +65,7 @@ report --since 24h` writes the report into the container's working directory.
 ```
 urania start            # start the background daemon
 urania stop             # stop (SIGTERM, graceful, up to 10s)
-urania status           # daemon, db, per-target last probe, open outages
+urania status           # daemon, db, per-target last probe + 1h availability, open outages
 urania once             # one probe round, table output, exit 0/1
 urania once --type tcp  # only TCP targets
 urania report --since 24h --to report.html

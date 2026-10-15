@@ -32,7 +32,9 @@ All notable changes to urania are documented here.
 - Daemon: single-instance flock + pidfile (no stale-lock states), graceful
   SIGTERM stop, daily log rotation (keep 2), `start|stop|status|once|report|verify|selftest`;
   `start` polls for the pidfile up to 5 s instead of one fixed 500 ms wait,
-  so a slow cold start is not misreported as a failure.
+  so a slow cold start is not misreported as a failure. `status` shows
+  per-target availability over the last hour (reference-only gateways show
+  `ref-only` instead of a percentage).
 - Deployment: systemd unit (dynamic user), Dockerfile (scratch + static musl
   binary), GitHub Actions CI (fmt + clippy + test, ubuntu + macOS) and
   release matrix (4 static binaries + SHA-256 checksums).

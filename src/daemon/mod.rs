@@ -213,7 +213,21 @@ pub fn status(cfg: &Config) -> i32 {
                 }
             );
             println!("  targets:");
+            let hour_ago = now_ms().saturating_sub(3_600_000);
             for t in &cfg.targets {
+                // Availability over the last hour: the at-a-glance health
+                // check. Reference-only gateways show no percentage —
+                // silence is their baseline state, not a failure.
+                let avail = if t.is_gateway() && !store.ever_ok(&t.name).unwrap_or(true) {
+                    "ref-only".to_string()
+                } else {
+                    match store.probe_counts_since(&t.name, hour_ago).unwrap_or(None) {
+                        Some((ok, total)) if total > 0 => {
+                            format!("avail(1h) {:.1}%", ok as f64 / total as f64 * 100.0)
+                        }
+                        _ => "no data(1h)".to_string(),
+                    }
+                };
                 match store.last_probe(&t.name) {
                     Ok(Some(row)) => {
                         let lat = row
@@ -221,12 +235,13 @@ pub fn status(cfg: &Config) -> i32 {
                             .map(|l| format!("{l:.1}ms"))
                             .unwrap_or_else(|| "—".into());
                         println!(
-                            "    {:<16} last {} {} {} ({})",
+                            "    {:<16} last {} {} {} ({}) · {}",
                             t.name,
                             fmt_ts(row.ts),
                             if row.ok { "ok" } else { "FAIL" },
                             lat,
-                            t.desc()
+                            t.desc(),
+                            avail
                         );
                     }
                     Ok(None) => println!("    {:<16} no data yet ({})", t.name, t.desc()),
