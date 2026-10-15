@@ -65,6 +65,9 @@ All notable changes to urania are documented here.
   the data (Collected by, from the db tool_version meta) — matters
   after an upgrade: data written by one build, rendered by another,
   is labeled as such.
+- Report: the summary table gains an Observed column (first → last
+  probe per target in the period) — states when the logger was
+  actually observing each target, next to the coverage percentage.
 - Config: fail-fast validation for an empty target list, whitespace-only
   target names, and ICMP endpoints containing whitespace (previously
   accepted, then logged silence or failed obscurely at probe time).
