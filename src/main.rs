@@ -65,7 +65,7 @@ async fn run(cli: cli::Cli) -> i32 {
             }
         }
         cli::Cmd::Stop => daemon::stop(&cfg),
-        cli::Cmd::Status { check } => daemon::status(&cfg, *check),
+        cli::Cmd::Status { check, json } => daemon::status(&cfg, *check, *json),
         cli::Cmd::Report {
             since,
             from,
@@ -297,36 +297,32 @@ async fn once(
         }
     }
     if json {
-        // Flat JSON for scripting. Hand-rolled (no serde_json dep): the
-        // only free-form fields are target names and detail strings,
-        // both controlled by urania.
+        // Flat JSON for scripting (serde_json: already in the tree via
+        // reqwest, now a direct dep for the machine-readable outputs).
         let ts = results
             .first()
             .map(|r| r.ts_wall_ms)
             .unwrap_or_else(crate::util::now_ms);
-        let items: Vec<String> = results
+        let items: Vec<serde_json::Value> = results
             .iter()
             .map(|r| {
-                let mut s = format!(
-                    "{{\"target\":\"{}\",\"type\":\"{}\",\"ok\":{}",
-                    json_escape(&r.target),
-                    r.probe_type,
-                    r.ok
-                );
+                let mut o = serde_json::json!({
+                    "target": r.target,
+                    "type": r.probe_type.to_string(),
+                    "ok": r.ok,
+                });
                 if let Some(l) = r.latency_ms {
-                    s.push_str(&format!(",\"latency_ms\":{l:.1}"));
+                    o["latency_ms"] = serde_json::json!(l);
                 }
                 if !r.detail.is_empty() {
-                    s.push_str(&format!(",\"detail\":\"{}\"", json_escape(&r.detail)));
+                    o["detail"] = serde_json::json!(r.detail);
                 }
-                s.push('}');
-                s
+                o
             })
             .collect();
         println!(
-            "{{\"ts\":{ts},\"all_ok\":{},\"results\":[{}]}}",
-            !any_fail,
-            items.join(",")
+            "{}",
+            serde_json::json!({ "ts": ts, "all_ok": !any_fail, "results": items })
         );
     } else {
         println!(
@@ -349,14 +345,4 @@ async fn once(
         }
     }
     if any_fail { 1 } else { 0 }
-}
-
-/// Minimal JSON string escaping for the controlled free-form fields
-/// (target names, probe detail strings).
-fn json_escape(s: &str) -> String {
-    s.replace('\\', "\\\\")
-        .replace('"', "\\\"")
-        .replace('\n', "\\n")
-        .replace('\r', "\\r")
-        .replace('\t', "\\t")
 }

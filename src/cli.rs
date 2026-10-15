@@ -34,6 +34,9 @@ pub enum Cmd {
         /// Scripting: print only the state, exit 0 = running, 1 = not running
         #[arg(long)]
         check: bool,
+        /// Machine-readable JSON (exit 0 = running, 1 = not running)
+        #[arg(long)]
+        json: bool,
     },
     /// Render the evidence report (self-contained HTML, optional CSV + SHA-256 manifest)
     Report {

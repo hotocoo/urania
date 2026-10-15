@@ -172,7 +172,7 @@ pub fn stop(cfg: &Config) -> i32 {
 
 /// Status: daemon, db, lock, per-target last probe, open outages.
 /// Degrades gracefully when the db is unreadable (roadmap T4).
-pub fn status(cfg: &Config, check: bool) -> i32 {
+pub fn status(cfg: &Config, check: bool, json: bool) -> i32 {
     let lock_path = config::lock_path(cfg);
     let running_pid = lock::peek(&lock_path);
     if check {
@@ -184,6 +184,9 @@ pub fn status(cfg: &Config, check: bool) -> i32 {
             println!("not running");
             1
         };
+    }
+    if json {
+        return status_json(cfg, &lock_path, running_pid);
     }
     println!("urania v{}", crate::version::full());
     let db_path = config::db_path(cfg);
@@ -304,6 +307,88 @@ pub fn status(cfg: &Config, check: bool) -> i32 {
         }
     }
     0
+}
+
+/// Machine-readable status for monitoring. Exit 0 = running, 1 = not
+/// running (the text form is human-facing and always exits 0).
+fn status_json(cfg: &Config, lock_path: &std::path::Path, running_pid: Option<u32>) -> i32 {
+    use serde_json::json;
+    let db_path = config::db_path(cfg);
+    let mut v = json!({
+        "version": crate::version::full(),
+        "running": running_pid.is_some(),
+        "pid": running_pid,
+        "uptime_s": serde_json::Value::Null,
+        "daemon_build": serde_json::Value::Null,
+        "db": serde_json::Value::Null,
+        "lock": { "path": lock_path.to_string_lossy().to_string(), "held": running_pid.is_some() },
+        "targets": [],
+        "open_outages": [],
+    });
+    if running_pid.is_some()
+        && let Ok(store) = Store::open(&db_path)
+    {
+        if let Ok(Some(started)) = store.get_meta("daemon_started_at")
+            && let Some(t) = parse_iso(&started)
+        {
+            v["uptime_s"] = json!(now_ms().saturating_sub(t) / 1000);
+        }
+        if let Ok(Some(tv)) = store.get_meta("tool_version") {
+            v["daemon_build"] = json!(tv);
+        }
+        let size = std::fs::metadata(&db_path).map(|m| m.len()).unwrap_or(0);
+        let rows = store.probe_count().unwrap_or(0);
+        v["db"] = json!({
+            "path": db_path.to_string_lossy().to_string(),
+            "size_bytes": size,
+            "rows": rows,
+            "retention_days": cfg.retention_days,
+        });
+        let hour_ago = now_ms().saturating_sub(3_600_000);
+        let mut targets = Vec::new();
+        for t in &cfg.targets {
+            let ref_only = t.is_gateway() && !store.ever_ok(&t.name).unwrap_or(true);
+            let avail = if ref_only {
+                None
+            } else {
+                store
+                    .probe_counts_since(&t.name, hour_ago)
+                    .ok()
+                    .flatten()
+                    .filter(|(_, total)| *total > 0)
+                    .map(|(ok, total)| ok as f64 / total as f64 * 100.0)
+            };
+            let last = store
+                .last_probe(&t.name)
+                .ok()
+                .flatten()
+                .map(|r| json!({ "ts": r.ts, "ok": r.ok, "latency_ms": r.latency_ms }));
+            targets.push(json!({
+                "name": t.name,
+                "type": t.probe_type.to_string(),
+                "last": last,
+                "avail_1h_pct": avail,
+                "ref_only": ref_only,
+            }));
+        }
+        v["targets"] = json!(targets);
+        if let Ok(open) = store.open_windows() {
+            v["open_outages"] = json!(
+                open.iter()
+                    .map(|w| {
+                        json!({
+                            "id": w.id,
+                            "target": w.target,
+                            "start_ts": w.start_ts,
+                            "probes_failed": w.probes_failed,
+                        })
+                    })
+                    .collect::<Vec<_>>()
+            );
+        }
+    }
+    println!("{v}");
+    if running_pid.is_some() { 0 } else { 1 }
 }
 
 /// Restart recovery (roadmap §7.3). Closes open windows whose target's last
@@ -475,6 +560,10 @@ pub async fn run_foreground(cfg: &Config) -> anyhow::Result<i32> {
     let mut detector = Detector::new(cfg.fail_threshold, &cfg.targets, gateway_target, &kept);
     let mut batch: Vec<probe::ProbeResult> = Vec::new();
     let mut prune_iv = tokio::time::interval(Duration::from_secs(6 * 3_600));
+    // Bounded data loss on crash: the batch otherwise flushes only on a
+    // detector command or at 100 rows — with long probe intervals that is
+    // hours. Flush at most every 5 s.
+    let mut flush_iv = tokio::time::interval(Duration::from_secs(5));
     tracing::info!("urania running: {} target(s)", handles.len());
 
     let mut shutdown = false;
@@ -502,6 +591,14 @@ pub async fn run_foreground(cfg: &Config) -> anyhow::Result<i32> {
             _ = prune_iv.tick() => {
                 if let Ok(n) = store.prune(cfg.retention_days) && n > 0 {
                     tracing::info!("retention: pruned {n} probe rows");
+                }
+            }
+            _ = flush_iv.tick() => {
+                if !batch.is_empty() {
+                    if let Err(e) = store.insert_probes(&batch) {
+                        tracing::error!("probe insert failed: {e}");
+                    }
+                    batch.clear();
                 }
             }
         }

@@ -67,6 +67,7 @@ urania start            # start the background daemon
 urania stop             # stop (SIGTERM, graceful, up to 10s)
 urania status           # daemon, db, per-target last probe + 1h availability, open outages
 urania status --check   # scripts: print state, exit 0 = running, 1 = not running
+urania status --json    # machine-readable status for monitoring (same exit codes)
 urania once             # one probe round, table output, exit 0/1
 urania once --type tcp  # only TCP targets
 urania once --json      # machine-readable output for scripts

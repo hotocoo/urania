@@ -92,6 +92,15 @@ All notable changes to urania are documented here.
   verify --quiet.
 - CLI: the report stdout line now names the period
   (e.g. "… (3600 probes, 0 outages, absolute window)").
+- CLI: `status --json` — machine-readable status for monitoring
+  (version, running, pid, uptime, daemon build, db, lock, per-target
+  last probe + 1h availability, open outages). Exit 0 = running,
+  1 = not running. `once --json` now uses serde_json (already in
+  the tree via reqwest; no new transitive deps).
+- Daemon: probe batch now flushes to the db at most every 5 s
+  (previously only on a detector command or at 100 rows — with
+  long probe intervals that was hours of unflushed evidence on
+  a crash). Bounded data loss: ≤5 s of probes.
 - Config: fail-fast validation for an empty target list, whitespace-only
   target names, and ICMP endpoints containing whitespace (previously
   accepted, then logged silence or failed obscurely at probe time).

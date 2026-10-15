@@ -101,6 +101,45 @@ async fn daemon_roundtrip_local_dummies() {
     );
     assert!(String::from_utf8_lossy(&st.stdout).contains("running"));
 
+    // status --json: valid JSON, running, targets present. Poll until the
+    // 5s batch flush has landed probe rows in the db (timing-independent).
+    let mut v = serde_json::Value::Null;
+    for _ in 0..20 {
+        let st_json = std::process::Command::new(bin)
+            .args(["status", "--json", "--config"])
+            .arg(&cfg_path)
+            .output()
+            .unwrap();
+        assert!(
+            st_json.status.success(),
+            "status --json should exit 0 while running: {}",
+            String::from_utf8_lossy(&st_json.stderr)
+        );
+        v = serde_json::from_slice(&st_json.stdout).unwrap_or_else(|e| {
+            panic!(
+                "status --json not valid JSON: {e}: {}",
+                String::from_utf8_lossy(&st_json.stdout)
+            )
+        });
+        if v["db"]["rows"].as_u64().unwrap_or(0) > 0 {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(500));
+    }
+    assert_eq!(v["running"], serde_json::json!(true));
+    assert!(v["pid"].is_number(), "pid: {v}");
+    assert!(
+        v["db"]["rows"].as_u64().unwrap_or(0) > 0,
+        "no probe rows after 10s: {v}"
+    );
+    let targets = v["targets"].as_array().unwrap();
+    assert!(
+        targets
+            .iter()
+            .any(|t| t["name"] == "tcp-local" && t["last"]["ok"].is_boolean()),
+        "tcp-local target with last probe: {v}"
+    );
+
     // SIGTERM → graceful stop.
     unsafe {
         libc::kill(pid as i32, libc::SIGTERM);
@@ -241,10 +280,17 @@ async fn daemon_roundtrip_local_dummies() {
         .unwrap();
     let out = String::from_utf8_lossy(&once_json.stdout);
     assert!(once_json.status.success(), "once --json failed: {out}");
-    assert!(out.starts_with("{\"ts\":"), "not JSON: {out}");
-    assert!(out.contains("\"all_ok\":true"));
-    assert!(out.contains("\"target\":\"tcp-local\""));
-    assert!(out.contains("\"ok\":true"));
+    let oj: serde_json::Value =
+        serde_json::from_str(&out).unwrap_or_else(|e| panic!("once --json not valid JSON: {e}: {out}"));
+    assert_eq!(oj["all_ok"], serde_json::json!(true));
+    assert!(
+        oj["results"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|r| r["target"] == "tcp-local" && r["ok"] == serde_json::json!(true)),
+        "tcp-local ok result: {out}"
+    );
 
     tcp_task.abort();
     http_task.abort();

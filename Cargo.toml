@@ -25,6 +25,9 @@ ping = { version = "0.10", optional = true }
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "http2"] }
 rusqlite = { version = "0.32", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
+# Direct dep for the machine-readable outputs (status --json, once --json).
+# Already in the tree via reqwest — no new transitive weight.
+serde_json = "1"
 sha2 = "0.10"
 thiserror = "2"
 toml = "0.8"
