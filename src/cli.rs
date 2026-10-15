@@ -46,6 +46,14 @@ pub enum Cmd {
         #[arg(long)]
         manifest: bool,
     },
+    /// Verify a report against its SHA-256 manifest (evidence integrity)
+    Verify {
+        /// Report HTML path (manifest expected at <path>.sha256)
+        report: PathBuf,
+        /// Explicit manifest path (default: <report>.sha256)
+        #[arg(long)]
+        manifest: Option<PathBuf>,
+    },
     /// Run one probe round, print a table, and exit (0 = all ok, 1 = any failed)
     Once {
         /// Only this target name

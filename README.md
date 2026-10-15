@@ -70,11 +70,13 @@ urania once             # one probe round, table output, exit 0/1
 urania once --type tcp  # only TCP targets
 urania report --since 24h --to report.html
 urania report --since 30d --to report.html --csv report.csv --manifest
+urania verify report.html   # check the report against report.html.sha256
 urania selftest         # round-trip check against known-good targets
 ```
 
 Exit codes: `once`/`selftest` 0 = all ok, 1 = any failure; `start` 2 =
-already running; `report` 3 = no data in period.
+already running; `report` 3 = no data in period; `verify` 1 = hash mismatch
+or missing file, 2 = unreadable/malformed manifest.
 
 ## The report
 
@@ -92,7 +94,9 @@ location, flap), footer (generator + optional SHA-256 manifest name).
 - **Location** = WiFi-vs-upstream from the gateway probe: `local` (gateway
   also failing), `upstream` (gateway fine), `unknown` (no gateway data).
 - **Flap** = window shorter than 2× interval, or ≥3 closes within an hour.
-- **Manifest** (`--manifest`) = SHA-256 of the HTML (+ CSV) for verification.
+- **Manifest** (`--manifest`) = SHA-256 of the HTML (+ CSV);
+  `urania verify report.html` re-checks it — attach the `.sha256` file with
+  the report so the recipient can prove it was not altered in transit.
 
 ## Configuration
 

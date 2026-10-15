@@ -80,7 +80,8 @@ fn clock_note() -> String {
     }
 }
 
-/// Spawn the detached daemon and verify it started (pidfile after 500 ms).
+/// Spawn the detached daemon and verify it started (polls for the pidfile
+/// up to 5 s — a cold start can take longer than a fixed 500 ms wait, T9).
 pub fn start(cfg: &Config, config_arg: Option<&Path>) -> i32 {
     let lock_path = config::lock_path(cfg);
     if let Some(pid) = lock::peek(&lock_path) {
@@ -118,9 +119,18 @@ pub fn start(cfg: &Config, config_arg: Option<&Path>) -> i32 {
             return 1;
         }
     }
-    // Verify: the daemon writes the pidfile after acquiring the lock.
-    std::thread::sleep(Duration::from_millis(500));
-    match lock::peek(&lock_path) {
+    // Verify: the daemon writes the pidfile after acquiring the lock. Poll
+    // instead of one fixed 500 ms sleep so a slow cold start is not
+    // misreported as a failure (T9).
+    let mut pid: Option<u32> = None;
+    for _ in 0..25 {
+        if let Some(p) = lock::peek(&lock_path) {
+            pid = Some(p);
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(200));
+    }
+    match pid {
         Some(pid) => {
             println!("urania started (pid {pid})");
             0

@@ -120,6 +120,43 @@ async fn run(cli: cli::Cli) -> i32 {
                 }
             }
         }
+        cli::Cmd::Verify { report, manifest } => {
+            let manifest_path = match manifest {
+                Some(p) => p.clone(),
+                None => {
+                    let name = report
+                        .file_name()
+                        .map(|n| n.to_string_lossy().to_string())
+                        .unwrap_or_default();
+                    report.with_file_name(format!("{name}.sha256"))
+                }
+            };
+            match report::manifest::verify_manifest(&manifest_path) {
+                Ok(results) => {
+                    let mut all_ok = true;
+                    for (name, ok) in &results {
+                        if !ok {
+                            all_ok = false;
+                        }
+                        println!("{}  {name}", if *ok { "ok" } else { "FAIL" });
+                    }
+                    if all_ok {
+                        println!("verify: {} — all hashes match", manifest_path.display());
+                        0
+                    } else {
+                        eprintln!(
+                            "verify: {} — hash mismatch or missing file",
+                            manifest_path.display()
+                        );
+                        1
+                    }
+                }
+                Err(e) => {
+                    eprintln!("urania: {e}");
+                    2
+                }
+            }
+        }
         cli::Cmd::Once { target, probe_type } => {
             once(&cfg, target.as_deref(), probe_type.as_deref()).await
         }

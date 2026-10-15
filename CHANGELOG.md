@@ -22,9 +22,13 @@ All notable changes to urania are documented here.
 - Storage: SQLite (WAL, bundled C source → fully static), 90-day retention,
   clock integrity (wall clock + monotonic delta per probe), restart recovery.
 - Report: self-contained HTML (inline SVG sparklines, zero JavaScript, zero
-  external requests), deterministic CSV, optional SHA-256 manifest.
+  external requests), deterministic CSV, optional SHA-256 manifest, and
+  `urania verify report.html` — re-hashes the report against the manifest so
+  a recipient can prove the attached evidence was not altered.
 - Daemon: single-instance flock + pidfile (no stale-lock states), graceful
-  SIGTERM stop, daily log rotation (keep 2), `start|stop|status|once|report|selftest`.
+  SIGTERM stop, daily log rotation (keep 2), `start|stop|status|once|report|verify|selftest`;
+  `start` polls for the pidfile up to 5 s instead of one fixed 500 ms wait,
+  so a slow cold start is not misreported as a failure.
 - Deployment: systemd unit (dynamic user), Dockerfile (scratch + static musl
   binary), GitHub Actions CI (fmt + clippy + test, ubuntu + macOS) and
   release matrix (4 static binaries + SHA-256 checksums).

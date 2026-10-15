@@ -6,7 +6,7 @@ use std::sync::Arc;
 use crate::config::{Config, ProbeType, Target};
 use crate::detect::{Detector, apply_cmd};
 use crate::probe::{self, Probe};
-use crate::report::{build_ctx, csv, html};
+use crate::report::{build_ctx, csv, html, manifest};
 use crate::store::Store;
 
 pub async fn run() -> anyhow::Result<i32> {
@@ -86,6 +86,14 @@ pub async fn run() -> anyhow::Result<i32> {
     let csv_path = temp.join("selftest.csv");
     csv::write_csv(&csv_path, &store.probes_in(0, i64::MAX)?)?;
 
+    // Manifest round-trip: write + verify the evidence integrity manifest.
+    let manifest_ok = match manifest::write_manifest(&[html_path.clone(), csv_path.clone()]) {
+        Ok(mp) => manifest::verify_manifest(&mp)
+            .map(|res| res.iter().all(|(_, ok)| *ok))
+            .unwrap_or(false),
+        Err(_) => false,
+    };
+
     let checks = vec![
         ("all probes ok", all_ok),
         ("0 outage windows", zero_windows),
@@ -105,6 +113,7 @@ pub async fn run() -> anyhow::Result<i32> {
             "no external urls",
             !html_text.contains("src=") && !html_text.contains("href=http"),
         ),
+        ("manifest verify", manifest_ok),
     ];
     let mut pass = true;
     for (name, ok) in &checks {
