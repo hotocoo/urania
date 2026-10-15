@@ -204,6 +204,9 @@ claim (many home routers run no TCP 80/443 service).
 - **More detail in the daemon log.** The log level follows `RUST_LOG`
   (default `info`): `RUST_LOG=debug urania run --foreground` for probe-level
   detail. Under systemd, add `Environment=RUST_LOG=debug` to the unit.
+  A healthy daemon with no outages is quiet by design; once a day it
+  writes a `heartbeat:` line (uptime + db row count) as a liveness
+  record, so a hung daemon is distinguishable from a quiet one.
 - **The gateway section says "reference probe (no outage claims)".** Normal
   for routers that do not answer TCP 80/443. The gateway target exists to
   attribute outages to the local link vs upstream; silence from a gateway that

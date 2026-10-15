@@ -130,6 +130,11 @@ All notable changes to urania are documented here.
   verify-first workflow (sha256sum -c, extract, install,
   selftest / selftest --offline) — an evidence tool you
   cannot authenticize is an evidence tool you cannot trust.
+- Daemon: once a day the daemon writes a `heartbeat:` line
+  (uptime + db row count) as a liveness record. A healthy
+  daemon with no outages was previously silent between start
+  and stop, so a hung daemon was indistinguishable from a
+  quiet one.
 - Config: fail-fast validation for an empty target list, whitespace-only
   target names, and ICMP endpoints containing whitespace (previously
   accepted, then logged silence or failed obscurely at probe time).

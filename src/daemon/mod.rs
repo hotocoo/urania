@@ -9,7 +9,7 @@ use std::os::unix::process::CommandExt;
 use std::path::Path;
 use std::process::Stdio;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use tokio::sync::mpsc;
 
@@ -566,6 +566,12 @@ pub async fn run_foreground(cfg: &Config) -> anyhow::Result<i32> {
     // detector command or at 100 rows — with long probe intervals that is
     // hours. Flush at most every 5 s.
     let mut flush_iv = tokio::time::interval(Duration::from_secs(5));
+    // Liveness record: a healthy daemon with zero outages logs nothing
+    // between start and stop, so a hang is indistinguishable from quiet.
+    // Once a day, prove the loop and the write path are alive.
+    let mut hb_iv = tokio::time::interval(Duration::from_secs(24 * 3_600));
+    let started = Instant::now();
+    hb_iv.tick().await; // first heartbeat at 24 h, not at startup
     tracing::info!("urania running: {} target(s)", handles.len());
 
     let mut shutdown = false;
@@ -602,6 +608,14 @@ pub async fn run_foreground(cfg: &Config) -> anyhow::Result<i32> {
                     }
                     batch.clear();
                 }
+            }
+            _ = hb_iv.tick() => {
+                let rows = store.probe_count().unwrap_or(-1);
+                tracing::info!(
+                    "heartbeat: alive after {} ({} probe row(s) in db)",
+                    fmt_duration(started.elapsed().as_millis() as i64),
+                    rows
+                );
             }
         }
     }
