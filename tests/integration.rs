@@ -95,7 +95,7 @@ async fn daemon_roundtrip_local_dummies() {
     let status = child.wait().unwrap();
     assert!(status.success(), "daemon exited with {status}");
 
-    // Report over the collected data.
+    // Report over the collected data, with a SHA-256 manifest.
     let out_html = dir.join("report.html");
     let out_csv = dir.join("report.csv");
     let rep = std::process::Command::new(bin)
@@ -103,6 +103,7 @@ async fn daemon_roundtrip_local_dummies() {
         .arg(&out_html)
         .arg("--csv")
         .arg(&out_csv)
+        .arg("--manifest")
         .arg("--config")
         .arg(&cfg_path)
         .output()
@@ -118,6 +119,60 @@ async fn daemon_roundtrip_local_dummies() {
     assert!(html.contains("http-local"));
     let csv_text = std::fs::read_to_string(&out_csv).unwrap();
     assert!(csv_text.lines().count() > 3, "csv too small: {csv_text}");
+    let manifest = dir.join("report.html.sha256");
+    assert!(manifest.exists(), "manifest not written");
+
+    // Evidence integrity: verify passes on the fresh report...
+    let ver = std::process::Command::new(bin)
+        .args(["verify"])
+        .arg(&out_html)
+        .arg("--config")
+        .arg(&cfg_path)
+        .output()
+        .unwrap();
+    assert!(
+        ver.status.success(),
+        "verify failed: {}\n{}",
+        String::from_utf8_lossy(&ver.stdout),
+        String::from_utf8_lossy(&ver.stderr)
+    );
+
+    // ...and fails (exit 1) when the report is tampered with.
+    {
+        use std::io::Write;
+        let mut f = std::fs::OpenOptions::new()
+            .append(true)
+            .open(&out_html)
+            .unwrap();
+        f.write_all(b"<!-- tampered -->").unwrap();
+    }
+    let ver = std::process::Command::new(bin)
+        .args(["verify"])
+        .arg(&out_html)
+        .arg("--config")
+        .arg(&cfg_path)
+        .output()
+        .unwrap();
+    assert!(
+        ver.status.code() == Some(1),
+        "tampered verify should exit 1, got {:?}: {}",
+        ver.status.code(),
+        String::from_utf8_lossy(&ver.stdout)
+    );
+
+    // once: one probe round against the still-running local TCP dummy.
+    let once = std::process::Command::new(bin)
+        .args(["once", "--target", "tcp-local", "--config"])
+        .arg(&cfg_path)
+        .output()
+        .unwrap();
+    assert!(
+        once.status.success(),
+        "once failed: {}\n{}",
+        String::from_utf8_lossy(&once.stdout),
+        String::from_utf8_lossy(&once.stderr)
+    );
+    assert!(String::from_utf8_lossy(&once.stdout).contains("tcp-local"));
 
     tcp_task.abort();
     http_task.abort();
