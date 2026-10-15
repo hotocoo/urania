@@ -109,6 +109,10 @@ All notable changes to urania are documented here.
   before packaging. Every release also publishes a multi-arch
   GHCR image (linux/amd64 + linux/arm64), smoke-tested with
   selftest after push.
+- CLI: `report --since` and `report --from` are now mutually
+  exclusive with an explicit error (previously --from silently
+  won, which could change the evidence window without the
+  user noticing). --since is now optional (default 24h).
 - Config: fail-fast validation for an empty target list, whitespace-only
   target names, and ICMP endpoints containing whitespace (previously
   accepted, then logged silence or failed obscurely at probe time).

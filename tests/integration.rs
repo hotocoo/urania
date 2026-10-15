@@ -311,6 +311,32 @@ async fn daemon_roundtrip_local_dummies() {
         "tcp-local with interval: {cout}"
     );
 
+    // report --since + --from: mutually exclusive, explicit error.
+    let conflict = std::process::Command::new(bin)
+        .args([
+            "report",
+            "--since",
+            "1h",
+            "--from",
+            "2020-01-01T00:00:00Z",
+            "--to",
+            "/tmp/should-not-exist.html",
+        ])
+        .arg("--config")
+        .arg(&cfg_path)
+        .output()
+        .unwrap();
+    assert!(
+        conflict.status.code() == Some(1),
+        "since+from should exit 1, got {:?}",
+        conflict.status.code()
+    );
+    assert!(
+        String::from_utf8_lossy(&conflict.stderr).contains("mutually exclusive"),
+        "stderr: {}",
+        String::from_utf8_lossy(&conflict.stderr)
+    );
+
     tcp_task.abort();
     http_task.abort();
     let _ = std::fs::remove_dir_all(&dir);

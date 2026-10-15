@@ -74,11 +74,18 @@ async fn run(cli: cli::Cli) -> i32 {
             csv,
             manifest,
         } => {
-            // Absolute incident window (--from [--end]) wins over --since.
+            // --since (trailing period) and --from (absolute window) are
+            // mutually exclusive: guessing which the user meant would
+            // silently change the evidence window.
+            if from.is_some() && since.is_some() {
+                eprintln!("urania: --since and --from are mutually exclusive");
+                return 1;
+            }
             if from.is_none() && end.is_some() {
                 eprintln!("urania: --end requires --from");
                 return 1;
             }
+            let since = since.clone().unwrap_or_else(|| "24h".to_string());
             let window = match from.as_deref() {
                 Some(f) => {
                     let f = util::parse_iso(f).unwrap_or_else(|| {
@@ -100,7 +107,7 @@ async fn run(cli: cli::Cli) -> i32 {
                 }
                 None => None,
             };
-            let period = match report::Period::parse(since) {
+            let period = match report::Period::parse(&since) {
                 Some(p) => p,
                 None => {
                     eprintln!("urania: --since must be 1h | 24h | 7d | 30d | 90d");

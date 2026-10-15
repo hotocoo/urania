@@ -40,9 +40,10 @@ pub enum Cmd {
     },
     /// Render the evidence report (self-contained HTML, optional CSV + SHA-256 manifest)
     Report {
-        /// Period: 1h | 24h | 7d | 30d | 90d (ignored if --from is given)
-        #[arg(long, default_value = "24h")]
-        since: String,
+        /// Period: 1h | 24h | 7d | 30d | 90d (default 24h; mutually
+        /// exclusive with --from)
+        #[arg(long)]
+        since: Option<String>,
         /// Absolute window start, RFC3339 (e.g. 2026-10-15T08:00:00+08:00);
         /// renders the incident window instead of a trailing period
         #[arg(long)]
