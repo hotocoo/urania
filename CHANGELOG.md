@@ -116,6 +116,16 @@ All notable changes to urania are documented here.
 - CLI: `once --quiet` — silent on success (exit code
   only); failures still print (the exit code says what,
   the output says which).
+- CLI: `selftest --offline` — the full evidence chain
+  (probe, store, detector, report, manifest, verify)
+  against a local TCP dummy, no network. For air-gapped
+  installs.
+- Daemon: the shutdown batch flush now logs how many
+  probe rows it wrote, and reports a failure instead of
+  silently swallowing it.
+- CLI: `status --json` open outages now include
+  `duration_s` (the text form always showed the elapsed
+  time; the JSON form was missing it).
 - Config: fail-fast validation for an empty target list, whitespace-only
   target names, and ICMP endpoints containing whitespace (previously
   accepted, then logged silence or failed obscurely at probe time).

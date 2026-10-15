@@ -373,6 +373,7 @@ fn status_json(cfg: &Config, lock_path: &std::path::Path, running_pid: Option<u3
         }
         v["targets"] = json!(targets);
         if let Ok(open) = store.open_windows() {
+            let now = now_ms();
             v["open_outages"] = json!(
                 open.iter()
                     .map(|w| {
@@ -380,6 +381,7 @@ fn status_json(cfg: &Config, lock_path: &std::path::Path, running_pid: Option<u3
                             "id": w.id,
                             "target": w.target,
                             "start_ts": w.start_ts,
+                            "duration_s": now.saturating_sub(w.start_ts) / 1000,
                             "probes_failed": w.probes_failed,
                         })
                     })
