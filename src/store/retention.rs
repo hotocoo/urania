@@ -47,11 +47,15 @@ mod tests {
         let now = now_ms();
         let mut rows = Vec::new();
         for i in 0..100 {
-            rows.push(row("t", now - (99 - i) * 86_400_000, true)); // 99 days ago → today
+            // Offsets 91..=100 days (pruned) and 0..=89 days (kept). No row
+            // sits exactly on the 90-day cutoff, so the result does not
+            // depend on the millisecond gap between the two now_ms() calls.
+            let offset_days = if i < 10 { 91 + i } else { i - 10 };
+            rows.push(row("t", now - offset_days * 86_400_000, true));
         }
         store.insert_probes(&rows).unwrap();
         let n = store.prune(90).unwrap();
-        assert_eq!(n, 9);
-        assert_eq!(store.probe_count().unwrap(), 91);
+        assert_eq!(n, 10);
+        assert_eq!(store.probe_count().unwrap(), 90);
     }
 }
