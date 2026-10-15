@@ -348,18 +348,10 @@ pub async fn run_foreground(cfg: &Config) -> anyhow::Result<i32> {
         None
     };
 
-    // ICMP capability check (feature-gated).
+    // ICMP capability check (feature-gated): enabled only when the config
+    // opts in AND the OS permits raw/dgram ICMP.
     #[cfg(feature = "icmp")]
-    let icmp_ok = if cfg.icmp
-        && cfg
-            .targets
-            .iter()
-            .any(|t| t.probe_type == crate::config::ProbeType::Icmp)
-    {
-        probe::icmp::available("127.0.0.1", 2)
-    } else {
-        true
-    };
+    let icmp_ok = cfg.icmp && probe::icmp::available("127.0.0.1", 2);
 
     let mut probes: Vec<Arc<dyn Probe>> = Vec::new();
     for t in &cfg.targets {
@@ -369,10 +361,17 @@ pub async fn run_foreground(cfg: &Config) -> anyhow::Result<i32> {
         }
         #[cfg(feature = "icmp")]
         if t.probe_type == crate::config::ProbeType::Icmp && !icmp_ok {
-            tracing::warn!(
-                "icmp target {} skipped: no permission (run as root or grant CAP_NET_RAW)",
-                t.name
-            );
+            if cfg.icmp {
+                tracing::warn!(
+                    "icmp target {} skipped: no permission (run as root or grant CAP_NET_RAW)",
+                    t.name
+                );
+            } else {
+                tracing::warn!(
+                    "icmp target {} skipped: icmp disabled in config (set icmp = true)",
+                    t.name
+                );
+            }
             continue;
         }
         match probe::build_probe(t, &gateway_ip) {

@@ -36,6 +36,7 @@ before publishing. Performed 2026-10-15.
 
 - [x] name free on crates.io
 - [x] wedge open (re-verified)
-- [ ] 24h soak (T7)
+- [x] icmp feature live-verified (2026-10-15: 9.0ms RTT to 1.1.1.1, unprivileged macOS)
+- [~] 24h soak (T7) — started 2026-10-15 21:19:55 +08 (pid 70840); automated verification scheduled 2026-10-16 21:35 +08 (DSH automation `urania 24h soak verification`)
 - [ ] trademark search (before commercial distribution)
-- [ ] repo + first release
+- [ ] repo + first release (owner: create `hotocoo/urania`, `git remote add origin … && git push -u origin main`)
