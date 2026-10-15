@@ -49,16 +49,25 @@ sudo systemctl enable --now urania
 
 ### Docker
 
+Pre-built multi-arch images (linux/amd64 + linux/arm64) are published to
+GHCR with every release:
+
+```
+docker run -d --name urania \
+  -v urania-data:/root/.local/share/urania ghcr.io/hotocoo/urania:latest
+```
+
+Or build from source (host architecture):
+
 ```
 docker build -t urania .
 docker run -d --name urania \
   -v urania-data:/root/.local/share/urania urania
 ```
 
-The image is a scratch container with one fully static musl binary (built
-for the host architecture; for other arches use the GitHub Releases
-binaries). The database lives in the mounted volume; `docker exec urania
-report --since 24h` writes the report into the container's working directory.
+The image is a scratch container with one fully static musl binary. The
+database lives in the mounted volume; `docker exec urania report --since
+24h` writes the report into the container's working directory.
 
 ## Usage
 

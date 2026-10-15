@@ -104,6 +104,11 @@ All notable changes to urania are documented here.
 - CLI: `config --json` — the effective configuration
   (source, db/log/lock paths, thresholds, all targets) as
   machine-readable JSON for config management and auditing.
+- Release: the x86_64-musl release binary now runs the full
+  selftest (local TCP dummy, probe, report, manifest, verify)
+  before packaging. Every release also publishes a multi-arch
+  GHCR image (linux/amd64 + linux/arm64), smoke-tested with
+  selftest after push.
 - Config: fail-fast validation for an empty target list, whitespace-only
   target names, and ICMP endpoints containing whitespace (previously
   accepted, then logged silence or failed obscurely at probe time).
