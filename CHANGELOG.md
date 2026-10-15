@@ -84,6 +84,9 @@ All notable changes to urania are documented here.
 - CLI: `report --from <RFC3339> [--end <RFC3339>]` — render an
   absolute incident window instead of a trailing period (the
   report header labels it "absolute window").
+- CLI: `verify --quiet` — silent on success (exit code only),
+  failures still print which file mismatched.
+- Docs: RUST_LOG controls the daemon log level (default info).
 - Config: fail-fast validation for an empty target list, whitespace-only
   target names, and ICMP endpoints containing whitespace (previously
   accepted, then logged silence or failed obscurely at probe time).

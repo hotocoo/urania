@@ -150,7 +150,11 @@ async fn run(cli: cli::Cli) -> i32 {
                 }
             }
         }
-        cli::Cmd::Verify { report, manifest } => {
+        cli::Cmd::Verify {
+            report,
+            manifest,
+            quiet,
+        } => {
             let manifest_path = match manifest {
                 Some(p) => p.clone(),
                 None => {
@@ -168,12 +172,18 @@ async fn run(cli: cli::Cli) -> i32 {
                         if !ok {
                             all_ok = false;
                         }
-                        println!("{}  {name}", if *ok { "ok" } else { "FAIL" });
+                        if !quiet {
+                            println!("{}  {name}", if *ok { "ok" } else { "FAIL" });
+                        }
                     }
                     if all_ok {
-                        println!("verify: {} — all hashes match", manifest_path.display());
+                        if !quiet {
+                            println!("verify: {} — all hashes match", manifest_path.display());
+                        }
                         0
                     } else {
+                        // Failures always print, quiet or not: the exit
+                        // code says *what*, the message says *which*.
                         eprintln!(
                             "verify: {} — hash mismatch or missing file",
                             manifest_path.display()

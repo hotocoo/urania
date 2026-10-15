@@ -64,6 +64,9 @@ pub enum Cmd {
         /// Explicit manifest path (default: <report>.sha256)
         #[arg(long)]
         manifest: Option<PathBuf>,
+        /// Silent on success (exit code only); failures still print
+        #[arg(long)]
+        quiet: bool,
     },
     /// Run one probe round, print a table, and exit (0 = all ok, 1 = any failed)
     Once {

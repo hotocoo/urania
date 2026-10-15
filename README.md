@@ -175,6 +175,9 @@ claim (many home routers run no TCP 80/443 service).
   best-effort in the header.
 - **`start` succeeded but `status` says not running.** Check the log in the
   data dir (daily rotation, keep 2).
+- **More detail in the daemon log.** The log level follows `RUST_LOG`
+  (default `info`): `RUST_LOG=debug urania run --foreground` for probe-level
+  detail. Under systemd, add `Environment=RUST_LOG=debug` to the unit.
 - **The gateway section says "reference probe (no outage claims)".** Normal
   for routers that do not answer TCP 80/443. The gateway target exists to
   attribute outages to the local link vs upstream; silence from a gateway that
