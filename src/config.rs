@@ -281,8 +281,18 @@ impl Config {
         if self.retention_days == 0 {
             return Err(ConfigError::Invalid("retention_days must be >= 1".into()));
         }
+        if self.targets.is_empty() {
+            // An explicit `target = []` would run a daemon that probes
+            // nothing — fail fast instead of logging silence.
+            return Err(ConfigError::Invalid(
+                "at least one [[target]] is required".into(),
+            ));
+        }
         let mut names = HashSet::new();
         for t in &self.targets {
+            if t.name.trim().is_empty() {
+                return Err(ConfigError::Invalid("target name must not be empty".into()));
+            }
             if !names.insert(t.name.as_str()) {
                 return Err(ConfigError::Invalid(format!(
                     "duplicate target name: {}",
@@ -342,9 +352,9 @@ impl Config {
                     }
                 }
                 ProbeType::Icmp => {
-                    if t.endpoint.trim().is_empty() {
+                    if t.endpoint.trim().is_empty() || t.endpoint.split_whitespace().count() > 1 {
                         return Err(ConfigError::Invalid(format!(
-                            "target {}: icmp endpoint empty",
+                            "target {}: icmp endpoint must be a single IP or hostname",
                             t.name
                         )));
                     }
@@ -380,6 +390,52 @@ mod tests {
         assert!(c.targets.iter().any(|t| t.is_gateway()));
         assert_eq!(c.fail_threshold, 3);
         assert_eq!(c.retention_days, 90);
+        assert!(c.validate().is_ok());
+    }
+
+    #[test]
+    fn rejects_empty_targets_and_names() {
+        // Explicit empty list: a daemon that probes nothing is a mistake.
+        let c: Config = toml::from_str("target = []").unwrap();
+        assert!(c.validate().is_err());
+
+        // Whitespace-only name.
+        let c = Config {
+            targets: vec![Target {
+                name: "   ".into(),
+                probe_type: ProbeType::Tcp,
+                endpoint: "1.1.1.1:443".into(),
+                interval: 5,
+                timeout: 3,
+            }],
+            ..Default::default()
+        };
+        assert!(c.validate().is_err());
+
+        // ICMP endpoint with whitespace.
+        let c = Config {
+            targets: vec![Target {
+                name: "icmp".into(),
+                probe_type: ProbeType::Icmp,
+                endpoint: "1.1.1.1 8.8.8.8".into(),
+                interval: 5,
+                timeout: 3,
+            }],
+            ..Default::default()
+        };
+        assert!(c.validate().is_err());
+
+        // Valid ICMP endpoint still passes.
+        let c = Config {
+            targets: vec![Target {
+                name: "icmp".into(),
+                probe_type: ProbeType::Icmp,
+                endpoint: "1.1.1.1".into(),
+                interval: 5,
+                timeout: 3,
+            }],
+            ..Default::default()
+        };
         assert!(c.validate().is_ok());
     }
 
