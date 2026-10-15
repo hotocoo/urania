@@ -194,6 +194,20 @@ impl Store {
         Ok(row)
     }
 
+    /// True if the target ever recorded an ok probe (full history, not just
+    /// the retention window). Used for gateway reference-only detection.
+    pub fn ever_ok(&self, target: &str) -> anyhow::Result<bool> {
+        let found: Option<i64> = self
+            .conn
+            .query_row(
+                "SELECT 1 FROM probes WHERE target = ?1 AND ok = 1 LIMIT 1",
+                params![target],
+                |r| r.get(0),
+            )
+            .optional()?;
+        Ok(found.is_some())
+    }
+
     pub fn open_windows(&self) -> anyhow::Result<Vec<WindowRow>> {
         let mut stmt = self.conn.prepare(
             "SELECT id, start_ts, target, probes_failed FROM outages WHERE end_ts IS NULL ORDER BY start_ts",
@@ -248,5 +262,35 @@ impl Store {
     /// Delete data older than the retention window. Returns pruned probe rows.
     pub fn prune(&self, retention_days: u32) -> anyhow::Result<u32> {
         retention::prune(&self.conn, retention_days)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::ProbeType;
+    use crate::probe::ProbeResult;
+
+    fn res(target: &str, ok: bool, ts: i64) -> ProbeResult {
+        ProbeResult {
+            ts_wall_ms: ts,
+            ts_mono_delta_ms: 0,
+            target: target.into(),
+            probe_type: ProbeType::Tcp,
+            ok,
+            latency_ms: ok.then_some(10.0),
+            detail: String::new(),
+        }
+    }
+
+    #[test]
+    fn ever_ok_tracks_full_history() {
+        let mut store = Store::open_in_memory().unwrap();
+        assert!(!store.ever_ok("gw").unwrap(), "no data yet");
+        store.insert_probes(&[res("gw", false, 1_000)]).unwrap();
+        assert!(!store.ever_ok("gw").unwrap(), "failures only");
+        store.insert_probes(&[res("gw", true, 2_000)]).unwrap();
+        assert!(store.ever_ok("gw").unwrap(), "one ok is enough");
+        assert!(!store.ever_ok("other").unwrap());
     }
 }

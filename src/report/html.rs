@@ -11,6 +11,9 @@ pub struct TargetInfo {
     pub probe_type: ProbeType,
     pub endpoint: String,
     pub interval: u64,
+    /// Gateway that never responded in the full history: rendered without an
+    /// availability or outage claim (silence is its baseline state).
+    pub reference_only: bool,
 }
 
 pub struct TargetData {
@@ -201,6 +204,15 @@ pub fn render_html(ctx: &HtmlCtx) -> String {
             s.push_str(" — no data in period</h2>\n</section>\n");
             continue;
         }
+        if info.reference_only {
+            let n = td.rows.len();
+            s.push_str(" — reference probe (no outage claims)</h2>\n");
+            s.push_str(&format!(
+                "<p>No TCP response from the gateway in this period ({n} probes, 0 responses). Many routers do not answer TCP 80/443, so silence is its baseline state: this target only attributes outages to local link vs upstream, and no availability or outage is claimed for it.</p>\n"
+            ));
+            s.push_str("</section>\n");
+            continue;
+        }
         let avail = availability_pct(&td.rows);
         s.push_str(&format!(" — availability {avail:.2}%</h2>\n"));
         let samples: Vec<(f64, bool)> = td
@@ -298,6 +310,7 @@ mod tests {
                 probe_type: ProbeType::Dns,
                 endpoint: "1.1.1.1".into(),
                 interval: 5,
+                reference_only: false,
             }],
             data: vec![TargetData {
                 name: "dns-cloudflare".into(),
@@ -366,6 +379,24 @@ mod tests {
         assert!(html.contains("Outages"));
         assert!(html.contains("dns:query-timeout@1.1.1.1"));
         assert!(html.contains("local"));
+    }
+
+    #[test]
+    fn reference_only_gateway_has_no_availability_claim() {
+        let rows: Vec<ProbeRow> = (0..50)
+            .map(|i| row("gateway", i * 5000, false, None))
+            .collect();
+        let mut ctx = ctx_with(rows, vec![]);
+        ctx.targets[0].name = "gateway".into();
+        ctx.targets[0].probe_type = ProbeType::Tcp;
+        ctx.targets[0].endpoint = "auto:443,80".into();
+        ctx.targets[0].reference_only = true;
+        ctx.data[0].name = "gateway".into();
+        let html = render_html(&ctx);
+        assert!(html.contains("reference probe (no outage claims)"));
+        assert!(html.contains("50 probes, 0 responses"));
+        assert!(!html.contains("availability 0.00%"));
+        assert!(!html.contains("<svg"), "no sparkline for reference-only");
     }
 
     #[test]

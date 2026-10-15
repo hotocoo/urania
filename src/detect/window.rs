@@ -23,6 +23,10 @@ pub struct TargetState {
     pub open: Option<WindowBuilder>,
     /// Close timestamps (for flap detection); trimmed to the last hour.
     pub recent_closes: VecDeque<i64>,
+    /// Gateway only: the device has never responded, so its silence is the
+    /// baseline state — no outage windows are opened for it. Cleared on the
+    /// first ok probe (a responsive gateway going silent is a real signal).
+    pub ref_only: bool,
 }
 
 impl TargetState {
@@ -32,6 +36,7 @@ impl TargetState {
             first_fail_ts: None,
             open: None,
             recent_closes: VecDeque::new(),
+            ref_only: false,
         }
     }
 }

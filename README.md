@@ -118,7 +118,10 @@ timeout = 3             # seconds
 Defaults (7 targets): DNS 1.1.1.1 + 8.8.8.8 (hand-rolled A query for
 example.com over TCP/53), TCP 1.1.1.1:443, HTTP gstatic + cloudflare, gateway
 `auto:443,80` (auto-detected default gateway, 443→80 fallback), ICMP 1.1.1.1
-(skipped unless `icmp = true` and the build has the feature).
+(skipped unless `icmp = true` and the build has the feature). The gateway is a
+reference probe: it attributes outages to local link vs upstream, and if the
+router has never answered TCP, its silence is recorded without an outage
+claim (many home routers run no TCP 80/443 service).
 
 ## FAQ
 
@@ -134,6 +137,12 @@ example.com over TCP/53), TCP 1.1.1.1:443, HTTP gstatic + cloudflare, gateway
   best-effort in the header.
 - **`start` succeeded but `status` says not running.** Check the log in the
   data dir (daily rotation, keep 2).
+- **The gateway section says "reference probe (no outage claims)".** Normal
+  for routers that do not answer TCP 80/443. The gateway target exists to
+  attribute outages to the local link vs upstream; silence from a gateway that
+  has never responded is its baseline state, not an outage. Once the gateway
+  has answered at least once, sustained silence is treated as a real
+  local-link outage.
 - **systemd DynamicUser.** The db is owned by the dynamic user; if `urania
   status` can't read it, use `systemctl status urania`.
 

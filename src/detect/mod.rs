@@ -159,13 +159,26 @@ impl Detector {
         let is_gateway = self.gateway_target.as_deref() == Some(target.as_str());
 
         let st = self.states.entry(target.clone()).or_default();
+        if res.ok && is_gateway && st.ref_only {
+            // The router answered: it is a responsive device from now on, so
+            // sustained silence is a real local-link signal again.
+            st.ref_only = false;
+        }
         match step(st, &res, threshold) {
             Event::Open {
                 start_ts,
                 probe_type,
                 detail,
             } => {
-                if let Ok(id) = store.open_window(&target, start_ts) {
+                // Gateway reference-only gate: if the router never responded
+                // in the full history, its silence is the baseline state, not
+                // an outage (many home routers run no TCP 80/443 service).
+                // Fail-open: if the history check errors, open the window.
+                let suppress_ref =
+                    is_gateway && (st.ref_only || !store.ever_ok(&target).unwrap_or(true));
+                if suppress_ref {
+                    st.ref_only = true;
+                } else if let Ok(id) = store.open_window(&target, start_ts) {
                     st.open = Some(WindowBuilder {
                         id,
                         start_ts,
@@ -410,6 +423,82 @@ mod tests {
         feed(&mut d, &store, res("ext", ProbeType::Dns, true, 5_000, ""));
         let o = store.outages_in(0, i64::MAX).unwrap();
         assert_eq!(o[0].location_class.as_deref(), Some("upstream"));
+    }
+
+    #[test]
+    fn gateway_never_ok_opens_no_window() {
+        let store = Store::open_in_memory().unwrap();
+        let mut d = detector();
+        for i in 0..10 {
+            feed(
+                &mut d,
+                &store,
+                res(
+                    "gw",
+                    ProbeType::Tcp,
+                    false,
+                    1_000 + i * 5_000,
+                    "unreachable@192.168.1.1:80",
+                ),
+            );
+        }
+        assert!(store.open_windows().unwrap().is_empty());
+        assert!(store.outages_in(0, i64::MAX).unwrap().is_empty());
+    }
+
+    #[test]
+    fn gateway_ever_ok_opens_window() {
+        let mut store = Store::open_in_memory().unwrap();
+        // The router answered before → sustained silence is a real signal.
+        store
+            .insert_probes(&[res("gw", ProbeType::Tcp, true, 1_000, "")])
+            .unwrap();
+        let mut d = detector();
+        for i in 0..3 {
+            feed(
+                &mut d,
+                &store,
+                res(
+                    "gw",
+                    ProbeType::Tcp,
+                    false,
+                    10_000 + i * 5_000,
+                    "unreachable@192.168.1.1:80",
+                ),
+            );
+        }
+        let open = store.open_windows().unwrap();
+        assert_eq!(open.len(), 1);
+        assert_eq!(open[0].target, "gw");
+    }
+
+    #[test]
+    fn gateway_ref_only_rearmed_after_first_ok() {
+        let mut store = Store::open_in_memory().unwrap();
+        let mut d = detector();
+        // Silence → suppressed (reference-only).
+        for i in 0..5 {
+            feed(
+                &mut d,
+                &store,
+                res("gw", ProbeType::Tcp, false, 1_000 + i * 5_000, "x"),
+            );
+        }
+        assert!(store.open_windows().unwrap().is_empty());
+        // The router answers once (row inserted, as the daemon does).
+        store
+            .insert_probes(&[res("gw", ProbeType::Tcp, true, 100_000, "")])
+            .unwrap();
+        feed(&mut d, &store, res("gw", ProbeType::Tcp, true, 100_000, ""));
+        // Sustained silence again → window opens.
+        for i in 0..3 {
+            feed(
+                &mut d,
+                &store,
+                res("gw", ProbeType::Tcp, false, 200_000 + i * 5_000, "x"),
+            );
+        }
+        assert_eq!(store.open_windows().unwrap().len(), 1);
     }
 
     #[test]

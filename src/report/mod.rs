@@ -94,11 +94,13 @@ pub fn build_ctx(
             .filter(|r| r.target == t.name)
             .cloned()
             .collect();
+        let reference_only = t.is_gateway() && !store.ever_ok(&t.name)?;
         targets.push(html::TargetInfo {
             name: t.name.clone(),
             probe_type: t.probe_type,
             endpoint: t.endpoint.clone(),
             interval: t.interval,
+            reference_only,
         });
         data.push(html::TargetData {
             name: t.name.clone(),

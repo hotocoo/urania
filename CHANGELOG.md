@@ -9,6 +9,14 @@ All notable changes to urania are documented here.
   TCP, HTTP (rustls, no OpenSSL); ICMP optional behind the `icmp` feature.
 - Gateway auto-detect (Linux `ip route`, macOS `route -n get default`) with
   443→80 fallback; imperfection degrades to `location_class = unknown`.
+- Gateway is a reference probe: a router that has never answered TCP is
+  recorded without an outage claim (many home routers run no TCP 80/443
+  service), so the report never shows a false 0% availability or a permanent
+  gateway outage. Once the gateway has answered at least once, sustained
+  silence opens a window as usual. Restart recovery closes pre-existing
+  reference-only gateway windows (cause `reference-only: …`). One live
+  evidence DB was corrected on 2026-10-15 (false open gateway window closed
+  with the reference-only cause).
 - Detection: outage windows (backdated to first failure), per-layer cause
   attribution, flap detection, WiFi-vs-upstream location class.
 - Storage: SQLite (WAL, bundled C source → fully static), 90-day retention,

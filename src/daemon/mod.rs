@@ -16,7 +16,7 @@ use tokio::sync::mpsc;
 use crate::config::{self, Config};
 use crate::detect::{Detector, apply_cmd};
 use crate::probe::{self, Probe};
-use crate::store::{CloseWindow, Store};
+use crate::store::{CloseWindow, Store, WindowRow};
 use crate::util::{fmt_duration, fmt_ts, now_iso, now_ms, parse_iso};
 
 /// Detect the default gateway: `ip route` (Linux) / `route -n get default` (macOS).
@@ -258,35 +258,41 @@ pub fn status(cfg: &Config) -> i32 {
     0
 }
 
-/// The real daemon loop (systemd / Docker / `start --foreground`).
-pub async fn run_foreground(cfg: &Config) -> anyhow::Result<i32> {
-    let data_dir = config::log_dir(cfg);
-    std::fs::create_dir_all(&data_dir)?;
-    let lock_path = config::lock_path(cfg);
-    let _lock = lock::PidLock::acquire(&lock_path)?;
-    let _log_guard = log::init_file(&data_dir)?;
-    tracing::info!(
-        "urania v{} starting (pid {})",
-        env!("CARGO_PKG_VERSION"),
-        std::process::id()
-    );
-
-    let mut store = Store::open(&config::db_path(cfg))?;
-    store.set_meta("tool_version", env!("CARGO_PKG_VERSION"))?;
-    store.set_meta("daemon_started_at", &now_iso())?;
-    store.set_meta("clock_note", &clock_note())?;
-    if let Ok(n) = store.prune(cfg.retention_days)
-        && n > 0
-    {
-        tracing::info!("retention: pruned {n} probe rows");
-    }
-
-    // Restart recovery (roadmap §7.3): close windows whose last probe was ok;
-    // re-seed the detector with the rest.
+/// Restart recovery (roadmap §7.3). Closes open windows whose target's last
+/// probe was ok (recovered while stopped) or that have no probe data, and
+/// closes gateway windows whose device never responded (reference-only:
+/// silence is its baseline state, not an outage). Returns the windows that
+/// stay open, for the detector to re-seed.
+pub fn recover_windows(
+    store: &Store,
+    gateway_target: Option<&str>,
+) -> anyhow::Result<Vec<WindowRow>> {
     let open = store.open_windows()?;
     let now = now_ms();
     let mut kept = Vec::new();
     for w in &open {
+        let ref_only_gateway = gateway_target.is_some()
+            && gateway_target == Some(w.target.as_str())
+            && !store.ever_ok(&w.target)?;
+        if ref_only_gateway {
+            store.close_window(&CloseWindow {
+                id: w.id,
+                end_ts: now,
+                layers: "tcp".into(),
+                cause: Some(
+                    "reference-only: gateway never responded to TCP (no outage claimed)".into(),
+                ),
+                location_class: "unknown".into(),
+                flap: false,
+                probes_failed: w.probes_failed as u32,
+            })?;
+            tracing::info!(
+                "recovery: closed reference-only gateway window {} for {} (device never responded)",
+                w.id,
+                w.target
+            );
+            continue;
+        }
         match store.last_probe(&w.target)? {
             Some(row) if !row.ok => kept.push(w.clone()),
             Some(row) => {
@@ -323,13 +329,44 @@ pub async fn run_foreground(cfg: &Config) -> anyhow::Result<i32> {
             }
         }
     }
+    Ok(kept)
+}
 
-    // Gateway auto-detect (T3: the port-list fallback lives in the probe).
+/// The real daemon loop (systemd / Docker / `start --foreground`).
+pub async fn run_foreground(cfg: &Config) -> anyhow::Result<i32> {
+    let data_dir = config::log_dir(cfg);
+    std::fs::create_dir_all(&data_dir)?;
+    let lock_path = config::lock_path(cfg);
+    let _lock = lock::PidLock::acquire(&lock_path)?;
+    let _log_guard = log::init_file(&data_dir)?;
+    tracing::info!(
+        "urania v{} starting (pid {})",
+        env!("CARGO_PKG_VERSION"),
+        std::process::id()
+    );
+
+    let mut store = Store::open(&config::db_path(cfg))?;
+    store.set_meta("tool_version", env!("CARGO_PKG_VERSION"))?;
+    store.set_meta("daemon_started_at", &now_iso())?;
+    store.set_meta("clock_note", &clock_note())?;
+    if let Ok(n) = store.prune(cfg.retention_days)
+        && n > 0
+    {
+        tracing::info!("retention: pruned {n} probe rows");
+    }
+
+    // Gateway target name (needed by restart recovery and probe construction).
     let gateway_target = cfg
         .targets
         .iter()
         .find(|t| t.is_gateway())
         .map(|t| t.name.clone());
+
+    // Restart recovery (roadmap §7.3): close windows whose last probe was ok
+    // or whose gateway never responded; re-seed the detector with the rest.
+    let kept = recover_windows(&store, gateway_target.as_deref())?;
+
+    // Gateway auto-detect (T3: the port-list fallback lives in the probe).
     let gateway_ip = if gateway_target.is_some() {
         match detect_gateway() {
             Some(ip) => {
@@ -436,4 +473,71 @@ pub async fn run_foreground(cfg: &Config) -> anyhow::Result<i32> {
     _lock.release();
     tracing::info!("urania stopped");
     Ok(0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::ProbeType;
+    use crate::probe::ProbeResult;
+
+    fn res(target: &str, ok: bool, ts: i64) -> ProbeResult {
+        ProbeResult {
+            ts_wall_ms: ts,
+            ts_mono_delta_ms: 0,
+            target: target.into(),
+            probe_type: ProbeType::Tcp,
+            ok,
+            latency_ms: ok.then_some(10.0),
+            detail: String::new(),
+        }
+    }
+
+    #[test]
+    fn recover_closes_ref_only_gateway_window() {
+        let mut store = Store::open_in_memory().unwrap();
+        store.open_window("gw", 1_000).unwrap();
+        store.insert_probes(&[res("gw", false, 500)]).unwrap();
+        let kept = recover_windows(&store, Some("gw")).unwrap();
+        assert!(kept.is_empty(), "ref-only gateway window must not be kept");
+        let o = store.outages_in(0, i64::MAX).unwrap();
+        assert_eq!(o.len(), 1);
+        assert!(o[0].end_ts.is_some());
+        assert!(o[0].cause.as_deref().unwrap().starts_with("reference-only"));
+    }
+
+    #[test]
+    fn recover_keeps_gateway_window_when_ever_ok() {
+        let mut store = Store::open_in_memory().unwrap();
+        store.open_window("gw", 1_000).unwrap();
+        store.insert_probes(&[res("gw", true, 500)]).unwrap();
+        store.insert_probes(&[res("gw", false, 900)]).unwrap();
+        let kept = recover_windows(&store, Some("gw")).unwrap();
+        assert_eq!(kept.len(), 1, "responsive gateway window stays open");
+    }
+
+    #[test]
+    fn recover_keeps_failed_non_gateway_window() {
+        let mut store = Store::open_in_memory().unwrap();
+        store.open_window("ext", 1_000).unwrap();
+        store.insert_probes(&[res("ext", false, 900)]).unwrap();
+        let kept = recover_windows(&store, Some("gw")).unwrap();
+        assert_eq!(kept.len(), 1);
+        assert_eq!(kept[0].target, "ext");
+    }
+
+    #[test]
+    fn recover_closes_window_with_last_ok_probe() {
+        let mut store = Store::open_in_memory().unwrap();
+        store.open_window("ext", 1_000).unwrap();
+        store.insert_probes(&[res("ext", true, 900)]).unwrap();
+        let kept = recover_windows(&store, Some("gw")).unwrap();
+        assert!(kept.is_empty());
+        let o = store.outages_in(0, i64::MAX).unwrap();
+        assert_eq!(o[0].end_ts, Some(900));
+        assert_eq!(
+            o[0].cause.as_deref(),
+            Some("recovered while daemon was stopped")
+        );
+    }
 }
