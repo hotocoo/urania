@@ -135,6 +135,11 @@ All notable changes to urania are documented here.
   daemon with no outages was previously silent between start
   and stop, so a hung daemon was indistinguishable from a
   quiet one.
+- CLI: `report --stdout` — the HTML report to stdout for CI
+  log attachments; the status line goes to stderr so
+  `report --stdout > r.html` is clean. The evidence chain
+  (--csv/--manifest) needs files on disk, so clap rejects
+  the combination.
 - Config: fail-fast validation for an empty target list, whitespace-only
   target names, and ICMP endpoints containing whitespace (previously
   accepted, then logged silence or failed obscurely at probe time).

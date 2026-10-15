@@ -60,6 +60,8 @@ pub struct ReportOpts {
     pub out_html: PathBuf,
     pub out_csv: Option<PathBuf>,
     pub manifest: bool,
+    /// Print the HTML to stdout instead of writing out_html.
+    pub stdout: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -244,8 +246,12 @@ pub fn render(
         },
     )?;
     let html_text = html::render_html(&ctx);
-    write_parent(&opts.out_html)?;
-    std::fs::write(&opts.out_html, &html_text)?;
+    if opts.stdout {
+        print!("{html_text}");
+    } else {
+        write_parent(&opts.out_html)?;
+        std::fs::write(&opts.out_html, &html_text)?;
+    }
 
     let mut manifest_path = None;
     if opts.manifest {

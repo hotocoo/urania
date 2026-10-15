@@ -60,6 +60,11 @@ pub enum Cmd {
         /// Write a SHA-256 manifest alongside the outputs
         #[arg(long)]
         manifest: bool,
+        /// Print the HTML to stdout instead of a file (CI log
+        /// attachments); the evidence chain (--csv/--manifest) needs
+        /// files on disk, so clap rejects the combination
+        #[arg(long, conflicts_with_all = ["csv", "manifest"])]
+        stdout: bool,
     },
     /// Verify a report against its SHA-256 manifest (evidence integrity)
     Verify {

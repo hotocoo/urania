@@ -336,6 +336,28 @@ async fn daemon_roundtrip_local_dummies() {
     );
     assert!(String::from_utf8_lossy(&st_off.stdout).contains("selftest: PASS"));
 
+    // report --stdout: HTML on stdout, status line on stderr.
+    let rep_s = std::process::Command::new(bin)
+        .args(["report", "--stdout", "--since", "24h", "--config"])
+        .arg(&cfg_path)
+        .output()
+        .unwrap();
+    assert!(rep_s.status.success(), "report --stdout failed");
+    let html_out = String::from_utf8_lossy(&rep_s.stdout);
+    assert!(
+        html_out.starts_with("<!doctype html>"),
+        "stdout must be pure HTML"
+    );
+    assert!(html_out.ends_with("</html>\n") || html_out.ends_with("</html>"));
+    assert!(
+        !html_out.contains("report:"),
+        "status line must not pollute stdout"
+    );
+    assert!(
+        String::from_utf8_lossy(&rep_s.stderr).contains("report: -"),
+        "status line goes to stderr"
+    );
+
     // report --since + --from: mutually exclusive, explicit error.
     let conflict = std::process::Command::new(bin)
         .args([

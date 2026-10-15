@@ -73,6 +73,7 @@ async fn run(cli: cli::Cli) -> i32 {
             to,
             csv,
             manifest,
+            stdout,
         } => {
             // --since (trailing period) and --from (absolute window) are
             // mutually exclusive: guessing which the user meant would
@@ -123,6 +124,7 @@ async fn run(cli: cli::Cli) -> i32 {
                 out_html,
                 out_csv: csv.clone(),
                 manifest: *manifest,
+                stdout: *stdout,
             };
             let store = match store::Store::open(&config::db_path(&cfg)) {
                 Ok(s) => s,
@@ -137,17 +139,26 @@ async fn run(cli: cli::Cli) -> i32 {
                         Some(_) => "absolute window",
                         None => opts.since.label(),
                     };
-                    println!(
-                        "report: {} ({} probes, {} outages, {label})",
-                        summary.html.display(),
-                        summary.probes,
-                        summary.outages
-                    );
-                    if let Some(c) = &summary.csv {
-                        println!("csv:      {}", c.display());
-                    }
-                    if let Some(m) = &summary.manifest {
-                        println!("manifest: {}", m.display());
+                    if opts.stdout {
+                        // The HTML owns stdout; the status line goes to
+                        // stderr so `report --stdout > r.html` is clean.
+                        eprintln!(
+                            "report: - ({} probes, {} outages, {label})",
+                            summary.probes, summary.outages
+                        );
+                    } else {
+                        println!(
+                            "report: {} ({} probes, {} outages, {label})",
+                            summary.html.display(),
+                            summary.probes,
+                            summary.outages
+                        );
+                        if let Some(c) = &summary.csv {
+                            println!("csv:      {}", c.display());
+                        }
+                        if let Some(m) = &summary.manifest {
+                            println!("manifest: {}", m.display());
+                        }
                     }
                     0
                 }
