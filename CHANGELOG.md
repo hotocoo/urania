@@ -52,6 +52,12 @@ All notable changes to urania are documented here.
   sums were indistinguishable — all binaries are named `urania`);
   tarballs include `LICENSE`; the x86_64-musl artifact is smoke-tested
   before packaging.
+- CLI: `urania status --check` — prints only the state and exits 0 =
+  running, 1 = not running, for cron/monitoring scripts (the full
+  `status` output is human-facing and always exited 0).
+- Test: the integration test now covers the full evidence loop —
+  `report --manifest`, `verify` (exit 0 fresh, exit 1 tampered),
+  `status --check` (0 running, 1 stopped), and `once --target`.
 - Daemon: single-instance flock + pidfile (no stale-lock states), graceful
   SIGTERM stop, daily log rotation (keep 2), `start|stop|status|once|report|verify|config|selftest`;
   `start` polls for the pidfile up to 5 s instead of one fixed 500 ms wait,

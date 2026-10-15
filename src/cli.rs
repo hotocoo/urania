@@ -30,7 +30,11 @@ pub enum Cmd {
     /// Stop the daemon (SIGTERM, graceful, up to 10s)
     Stop,
     /// Show daemon, database, and target status
-    Status,
+    Status {
+        /// Scripting: print only the state, exit 0 = running, 1 = not running
+        #[arg(long)]
+        check: bool,
+    },
     /// Render the evidence report (self-contained HTML, optional CSV + SHA-256 manifest)
     Report {
         /// Period: 1h | 24h | 7d | 30d | 90d

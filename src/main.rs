@@ -64,7 +64,7 @@ async fn run(cli: cli::Cli) -> i32 {
             }
         }
         cli::Cmd::Stop => daemon::stop(&cfg),
-        cli::Cmd::Status => daemon::status(&cfg),
+        cli::Cmd::Status { check } => daemon::status(&cfg, *check),
         cli::Cmd::Report {
             since,
             to,

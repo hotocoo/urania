@@ -66,6 +66,7 @@ report --since 24h` writes the report into the container's working directory.
 urania start            # start the background daemon
 urania stop             # stop (SIGTERM, graceful, up to 10s)
 urania status           # daemon, db, per-target last probe + 1h availability, open outages
+urania status --check   # scripts: print state, exit 0 = running, 1 = not running
 urania once             # one probe round, table output, exit 0/1
 urania once --type tcp  # only TCP targets
 urania report --since 24h --to report.html
@@ -76,8 +77,9 @@ urania selftest         # round-trip check against known-good targets
 ```
 
 Exit codes: `once`/`selftest` 0 = all ok, 1 = any failure; `start` 2 =
-already running; `report` 3 = no data in period; `verify` 1 = hash mismatch
-or missing file, 2 = unreadable/malformed manifest.
+already running; `status --check` 1 = not running; `report` 3 = no data in
+period; `verify` 1 = hash mismatch or missing file, 2 = unreadable/malformed
+manifest.
 
 ## The report
 

@@ -88,12 +88,37 @@ async fn daemon_roundtrip_local_dummies() {
     // Let it probe for a few rounds (1s interval).
     std::thread::sleep(Duration::from_millis(3_500));
 
+    // status --check: exit 0 while running.
+    let st = std::process::Command::new(bin)
+        .args(["status", "--check", "--config"])
+        .arg(&cfg_path)
+        .output()
+        .unwrap();
+    assert!(
+        st.status.success(),
+        "status --check should exit 0 while running: {}",
+        String::from_utf8_lossy(&st.stdout)
+    );
+    assert!(String::from_utf8_lossy(&st.stdout).contains("running"));
+
     // SIGTERM → graceful stop.
     unsafe {
         libc::kill(pid as i32, libc::SIGTERM);
     }
     let status = child.wait().unwrap();
     assert!(status.success(), "daemon exited with {status}");
+
+    // status --check: exit 1 after the stop.
+    let st = std::process::Command::new(bin)
+        .args(["status", "--check", "--config"])
+        .arg(&cfg_path)
+        .output()
+        .unwrap();
+    assert!(
+        st.status.code() == Some(1),
+        "status --check should exit 1 when not running, got {:?}",
+        st.status.code()
+    );
 
     // Report over the collected data, with a SHA-256 manifest.
     let out_html = dir.join("report.html");

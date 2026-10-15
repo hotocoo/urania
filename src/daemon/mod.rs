@@ -172,10 +172,20 @@ pub fn stop(cfg: &Config) -> i32 {
 
 /// Status: daemon, db, lock, per-target last probe, open outages.
 /// Degrades gracefully when the db is unreadable (roadmap T4).
-pub fn status(cfg: &Config) -> i32 {
-    println!("urania v{}", env!("CARGO_PKG_VERSION"));
+pub fn status(cfg: &Config, check: bool) -> i32 {
     let lock_path = config::lock_path(cfg);
     let running_pid = lock::peek(&lock_path);
+    if check {
+        // Scripting/monitoring: state word + exit code, no full output.
+        return if running_pid.is_some() {
+            println!("running");
+            0
+        } else {
+            println!("not running");
+            1
+        };
+    }
+    println!("urania v{}", env!("CARGO_PKG_VERSION"));
     let db_path = config::db_path(cfg);
 
     let uptime = if let Some(pid) = running_pid {
