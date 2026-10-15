@@ -87,6 +87,11 @@ All notable changes to urania are documented here.
 - CLI: `verify --quiet` — silent on success (exit code only),
   failures still print which file mismatched.
 - Docs: RUST_LOG controls the daemon log level (default info).
+- Test: the integration test now covers the absolute-window
+  report path (--from, "absolute window" label, verify) and
+  verify --quiet.
+- CLI: the report stdout line now names the period
+  (e.g. "… (3600 probes, 0 outages, absolute window)").
 - Config: fail-fast validation for an empty target list, whitespace-only
   target names, and ICMP endpoints containing whitespace (previously
   accepted, then logged silence or failed obscurely at probe time).

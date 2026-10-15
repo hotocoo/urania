@@ -162,6 +162,40 @@ async fn daemon_roundtrip_local_dummies() {
         String::from_utf8_lossy(&ver.stderr)
     );
 
+    // Absolute incident window: --from (far past) with --end defaulting to
+    // now must cover everything the daemon wrote, be labeled as an
+    // absolute window, and pass verify.
+    let win_html = dir.join("window.html");
+    let win = std::process::Command::new(bin)
+        .args(["report", "--from", "2020-01-01T00:00:00Z", "--to"])
+        .arg(&win_html)
+        .arg("--manifest")
+        .arg("--config")
+        .arg(&cfg_path)
+        .output()
+        .unwrap();
+    assert!(
+        win.status.success(),
+        "window report failed: {}\n{}",
+        String::from_utf8_lossy(&win.stdout),
+        String::from_utf8_lossy(&win.stderr)
+    );
+    let win_text = std::fs::read_to_string(&win_html).unwrap();
+    assert!(win_text.contains("absolute window"));
+    assert!(win_text.contains("tcp-local"));
+    let win_ver = std::process::Command::new(bin)
+        .args(["verify", "--quiet"])
+        .arg(&win_html)
+        .arg("--config")
+        .arg(&cfg_path)
+        .output()
+        .unwrap();
+    assert!(
+        win_ver.status.success(),
+        "window verify failed: {}",
+        String::from_utf8_lossy(&win_ver.stderr)
+    );
+
     // ...and fails (exit 1) when the report is tampered with.
     {
         use std::io::Write;

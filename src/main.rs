@@ -126,8 +126,12 @@ async fn run(cli: cli::Cli) -> i32 {
             };
             match report::render(&cfg, &store, &opts) {
                 Ok(summary) => {
+                    let label = match opts.window {
+                        Some(_) => "absolute window",
+                        None => opts.since.label(),
+                    };
                     println!(
-                        "report: {} ({} probes, {} outages)",
+                        "report: {} ({} probes, {} outages, {label})",
                         summary.html.display(),
                         summary.probes,
                         summary.outages
