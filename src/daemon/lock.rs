@@ -24,20 +24,21 @@ impl PidLock {
         if let Some(pid) = peek(path) {
             anyhow::bail!("already running (pid {pid})");
         }
-        // Truncating the stale pidfile early is safe: the live-pid pre-check
-        // above already bailed, so no live daemon owns the file yet.
+        // Lock BEFORE truncating: truncating first is a TOCTOU race — a
+        // concurrently starting daemon could wipe our pid out of the
+        // pidfile while we are still blocked on the lock. The kernel
+        // releases a dead holder's flock, so a stale pidfile never
+        // blocks us here.
         let mut file = OpenOptions::new()
             .read(true)
             .write(true)
             .create(true)
-            .truncate(true)
             .open(path)?;
-        // The live-pid pre-check above already bailed; the blocking lock only
-        // contends in the rare race where a daemon starts concurrently.
-        if let Err(e) = file.lock_exclusive() {
+        if let Err(e) = file.try_lock_exclusive() {
             let pid = peek(path);
             anyhow::bail!("already running (pid {:?}): {e}", pid);
         }
+        file.set_len(0)?;
         writeln!(file, "{}", std::process::id())?;
         file.flush()?;
         Ok(PidLock {

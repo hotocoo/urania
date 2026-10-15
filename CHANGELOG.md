@@ -151,6 +151,13 @@ All notable changes to urania are documented here.
   counted, so an outage that began before the period and is
   still running (the one that matters most) was missing
   from the report.
+- Daemon: the single-instance lock now acquires the flock
+  before truncating the pidfile, and uses a non-blocking
+  try-lock. Previously a concurrently starting daemon could
+  truncate the live daemon's pid out of the pidfile and
+  then block on the lock — corrupting `status` while the
+  daemon ran. Double-start now fails fast with the live
+  pid in every case.
 - Config: fail-fast validation for an empty target list, whitespace-only
   target names, and ICMP endpoints containing whitespace (previously
   accepted, then logged silence or failed obscurely at probe time).
