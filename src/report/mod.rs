@@ -7,7 +7,7 @@ pub mod manifest;
 use std::path::{Path, PathBuf};
 
 use crate::config::Config;
-use crate::store::Store;
+use crate::store::{OutageRow, ProbeRow, Store};
 use crate::util::now_ms;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -75,6 +75,14 @@ pub enum ReportError {
     Store(#[from] anyhow::Error),
 }
 
+/// Period + labeling parameters for HTML context construction.
+struct CtxMeta<'a> {
+    from_ms: i64,
+    to_ms: i64,
+    period_label: &'a str,
+    manifest_name: Option<String>,
+}
+
 /// Build the full HTML context from the store (shared by `report` and `selftest`).
 pub fn build_ctx(
     cfg: &Config,
@@ -86,14 +94,46 @@ pub fn build_ctx(
 ) -> Result<html::HtmlCtx, ReportError> {
     let rows = store.probes_in(from_ms, to_ms)?;
     let outages = store.outages_in(from_ms, to_ms)?;
+    build_ctx_fetched(
+        cfg,
+        store,
+        rows,
+        outages,
+        CtxMeta {
+            from_ms,
+            to_ms,
+            period_label,
+            manifest_name,
+        },
+    )
+}
+
+/// Build the HTML context from already-fetched rows: one table scan per
+/// render, and the rows are partitioned into targets in a single pass
+/// (no per-target filter+clone over the full set).
+fn build_ctx_fetched(
+    cfg: &Config,
+    store: &Store,
+    rows: Vec<ProbeRow>,
+    outages: Vec<OutageRow>,
+    meta: CtxMeta<'_>,
+) -> Result<html::HtmlCtx, ReportError> {
+    let CtxMeta {
+        from_ms,
+        to_ms,
+        period_label,
+        manifest_name,
+    } = meta;
+    let names: Vec<&str> = cfg.targets.iter().map(|t| t.name.as_str()).collect();
+    let mut per_target: Vec<Vec<ProbeRow>> = vec![Vec::new(); cfg.targets.len()];
+    for r in rows {
+        if let Some(i) = names.iter().position(|n| *n == r.target) {
+            per_target[i].push(r);
+        }
+    }
     let mut targets = Vec::new();
     let mut data = Vec::new();
-    for t in &cfg.targets {
-        let trows: Vec<crate::store::ProbeRow> = rows
-            .iter()
-            .filter(|r| r.target == t.name)
-            .cloned()
-            .collect();
+    for (t, trows) in cfg.targets.iter().zip(per_target) {
         let reference_only = t.is_gateway() && !store.ever_ok(&t.name)?;
         targets.push(html::TargetInfo {
             name: t.name.clone(),
@@ -156,10 +196,10 @@ pub fn render(
         None
     };
 
-    let ctx = build_ctx(cfg, store, from, to, opts.since.label(), manifest_name)?;
-    let html_text = html::render_html(&ctx);
-    write_parent(&opts.out_html)?;
-    std::fs::write(&opts.out_html, &html_text)?;
+    // One scan feeds everything: record the counts, write the CSV, then
+    // hand the rows to the HTML context builder (which takes ownership).
+    let probe_count = rows.len();
+    let outage_count = outages.len();
 
     let mut csv_path = None;
     if let Some(p) = &opts.out_csv {
@@ -167,6 +207,22 @@ pub fn render(
         csv::write_csv(p, &rows)?;
         csv_path = Some(p.clone());
     }
+
+    let ctx = build_ctx_fetched(
+        cfg,
+        store,
+        rows,
+        outages,
+        CtxMeta {
+            from_ms: from,
+            to_ms: to,
+            period_label: opts.since.label(),
+            manifest_name,
+        },
+    )?;
+    let html_text = html::render_html(&ctx);
+    write_parent(&opts.out_html)?;
+    std::fs::write(&opts.out_html, &html_text)?;
 
     let mut manifest_path = None;
     if opts.manifest {
@@ -182,8 +238,8 @@ pub fn render(
         html: opts.out_html.clone(),
         csv: csv_path,
         manifest: manifest_path,
-        probes: rows.len(),
-        outages: outages.len(),
+        probes: probe_count,
+        outages: outage_count,
     })
 }
 
@@ -194,4 +250,79 @@ fn write_parent(path: &Path) -> std::io::Result<()> {
         std::fs::create_dir_all(parent)?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::{ProbeType, Target};
+    use crate::store::Store;
+
+    fn prow(target: &str, ts: i64, ok: bool) -> ProbeRow {
+        ProbeRow {
+            ts,
+            ts_mono_delta_ms: None,
+            target: target.into(),
+            probe_type: "dns".into(),
+            ok,
+            latency_ms: ok.then_some(10.0),
+            detail: String::new(),
+        }
+    }
+
+    #[test]
+    fn build_ctx_partitions_rows_single_pass() {
+        let store = Store::open_in_memory().unwrap();
+        let cfg = Config {
+            targets: vec![
+                Target {
+                    name: "a".into(),
+                    probe_type: ProbeType::Dns,
+                    endpoint: "1.1.1.1".into(),
+                    interval: 5,
+                    timeout: 5,
+                },
+                Target {
+                    name: "b".into(),
+                    probe_type: ProbeType::Tcp,
+                    endpoint: "1.1.1.1:443".into(),
+                    interval: 5,
+                    timeout: 5,
+                },
+            ],
+            ..Default::default()
+        };
+        // Interleaved targets, an unknown (renamed) target, unsorted ts:
+        // per-target input order must be preserved and unknown rows dropped.
+        let rows = vec![
+            prow("a", 3000, true),
+            prow("b", 2000, false),
+            prow("legacy", 1500, true),
+            prow("a", 1000, true),
+            prow("b", 4000, true),
+        ];
+        let ctx = build_ctx_fetched(
+            &cfg,
+            &store,
+            rows,
+            vec![],
+            CtxMeta {
+                from_ms: 0,
+                to_ms: 10_000,
+                period_label: "test",
+                manifest_name: None,
+            },
+        )
+        .unwrap();
+        assert_eq!(ctx.data.len(), 2);
+        let a_ts: Vec<i64> = ctx.data[0].rows.iter().map(|r| r.ts).collect();
+        let b_ts: Vec<i64> = ctx.data[1].rows.iter().map(|r| r.ts).collect();
+        assert_eq!(a_ts, vec![3000, 1000]);
+        assert_eq!(b_ts, vec![2000, 4000]);
+        assert!(
+            ctx.data
+                .iter()
+                .all(|d| d.rows.iter().all(|r| r.target != "legacy"))
+        );
+    }
 }

@@ -25,6 +25,10 @@ All notable changes to urania are documented here.
   external requests), deterministic CSV, optional SHA-256 manifest, and
   `urania verify report.html` — re-hashes the report against the manifest so
   a recipient can prove the attached evidence was not altered.
+- Performance: report rendering does a single probe-table scan (previously
+  two) and partitions rows into targets in one pass (previously a
+  filter+clone per target); output is byte-identical for a given DB
+  snapshot (verified by old-vs-new diff).
 - Daemon: single-instance flock + pidfile (no stale-lock states), graceful
   SIGTERM stop, daily log rotation (keep 2), `start|stop|status|once|report|verify|selftest`;
   `start` polls for the pidfile up to 5 s instead of one fixed 500 ms wait,
