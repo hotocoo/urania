@@ -36,7 +36,20 @@ cargo build --release
 ### Prebuilt binaries
 
 GitHub Releases: 4 static binaries (x86_64/aarch64 × linux-musl/darwin) +
-SHA256SUMS.
+SHA256SUMS. Verify before running — an evidence tool you cannot
+authenticize is an evidence tool you cannot trust:
+
+```
+# from the release assets: the tarball for your arch + SHA256SUMS
+sha256sum -c SHA256SUMS --ignore-missing
+tar xzf urania-v0.1.0-x86_64-unknown-linux-musl.tar.gz
+sudo install urania /usr/local/bin/
+urania selftest          # full evidence chain on this machine
+urania selftest --offline # no network available? this instead
+```
+
+All binaries are fully static (no libc/OpenSSL); the linux-musl
+tarball runs on any Linux distro with the matching CPU architecture.
 
 ### systemd (Linux)
 
