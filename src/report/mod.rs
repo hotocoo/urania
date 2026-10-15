@@ -85,6 +85,8 @@ struct CtxMeta<'a> {
     to_ms: i64,
     period_label: &'a str,
     manifest_name: Option<String>,
+    /// Build commit for provenance (header + footer), if the build had git.
+    build_hash: Option<&'a str>,
 }
 
 /// Build the full HTML context from the store (shared by `report` and `selftest`).
@@ -108,6 +110,7 @@ pub fn build_ctx(
             to_ms,
             period_label,
             manifest_name,
+            build_hash: crate::version::hash(),
         },
     )
 }
@@ -127,6 +130,7 @@ fn build_ctx_fetched(
         to_ms,
         period_label,
         manifest_name,
+        build_hash,
     } = meta;
     let names: Vec<&str> = cfg.targets.iter().map(|t| t.name.as_str()).collect();
     let mut per_target: Vec<Vec<ProbeRow>> = vec![Vec::new(); cfg.targets.len()];
@@ -165,6 +169,7 @@ fn build_ctx_fetched(
         clock_note,
         retention_days: cfg.retention_days,
         manifest_name,
+        build_hash: build_hash.map(str::to_string),
     })
 }
 
@@ -222,6 +227,7 @@ pub fn render(
             to_ms: to,
             period_label: opts.since.label(),
             manifest_name,
+            build_hash: crate::version::hash(),
         },
     )?;
     let html_text = html::render_html(&ctx);
@@ -332,6 +338,7 @@ mod tests {
                 to_ms: 10_000,
                 period_label: "test",
                 manifest_name: None,
+                build_hash: None,
             },
         )
         .unwrap();

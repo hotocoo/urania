@@ -185,7 +185,7 @@ pub fn status(cfg: &Config, check: bool) -> i32 {
             1
         };
     }
-    println!("urania v{}", env!("CARGO_PKG_VERSION"));
+    println!("urania v{}", crate::version::full());
     let db_path = config::db_path(cfg);
 
     let uptime = if let Some(pid) = running_pid {
@@ -376,12 +376,13 @@ pub async fn run_foreground(cfg: &Config) -> anyhow::Result<i32> {
     let _log_guard = log::init_file(&data_dir)?;
     tracing::info!(
         "urania v{} starting (pid {})",
-        env!("CARGO_PKG_VERSION"),
+        crate::version::full(),
         std::process::id()
     );
 
     let mut store = Store::open(&config::db_path(cfg))?;
-    store.set_meta("tool_version", env!("CARGO_PKG_VERSION"))?;
+    // Provenance: the db records which exact build wrote its data.
+    store.set_meta("tool_version", &crate::version::full())?;
     store.set_meta("daemon_started_at", &now_iso())?;
     store.set_meta("clock_note", &clock_note())?;
     if let Ok(n) = store.prune(cfg.retention_days)

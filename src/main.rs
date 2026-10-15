@@ -9,6 +9,7 @@ mod report;
 mod selftest;
 mod store;
 mod util;
+mod version;
 
 use std::sync::Arc;
 
@@ -171,7 +172,7 @@ async fn run(cli: cli::Cli) -> i32 {
                     }
                 }
             };
-            println!("urania v{}", env!("CARGO_PKG_VERSION"));
+            println!("urania v{}", version::full());
             println!("  config:    {source}");
             println!("  db:        {}", config::db_path(&cfg).display());
             println!("  log:       {}/", config::log_dir(&cfg).display());
