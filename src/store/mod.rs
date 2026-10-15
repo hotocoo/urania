@@ -48,6 +48,9 @@ pub struct WindowRow {
     pub id: i64,
     pub start_ts: i64,
     pub target: String,
+    /// Layer attribution recorded when the window opened (restart
+    /// recovery must preserve it, not overwrite with "unknown").
+    pub layers: String,
     pub probes_failed: i64,
 }
 
@@ -210,14 +213,16 @@ impl Store {
 
     pub fn open_windows(&self) -> anyhow::Result<Vec<WindowRow>> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, start_ts, target, probes_failed FROM outages WHERE end_ts IS NULL ORDER BY start_ts",
+            "SELECT id, start_ts, target, layers, probes_failed
+             FROM outages WHERE end_ts IS NULL ORDER BY start_ts",
         )?;
         let rows = stmt.query_map([], |r| {
             Ok(WindowRow {
                 id: r.get(0)?,
                 start_ts: r.get(1)?,
                 target: r.get(2)?,
-                probes_failed: r.get(3)?,
+                layers: r.get(3)?,
+                probes_failed: r.get(4)?,
             })
         })?;
         let mut out = Vec::new();

@@ -158,6 +158,11 @@ All notable changes to urania are documented here.
   then block on the lock — corrupting `status` while the
   daemon ran. Double-start now fails fast with the live
   pid in every case.
+- Daemon: restart recovery now preserves the layer
+  attribution recorded when an outage window opened
+  (e.g. `tcp+dns`). Previously the recovery close paths
+  overwrote it with `unknown`, losing evidence of which
+  layers had failed.
 - Config: fail-fast validation for an empty target list, whitespace-only
   target names, and ICMP endpoints containing whitespace (previously
   accepted, then logged silence or failed obscurely at probe time).

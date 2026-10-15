@@ -413,7 +413,7 @@ pub fn recover_windows(
             store.close_window(&CloseWindow {
                 id: w.id,
                 end_ts: now,
-                layers: "tcp".into(),
+                layers: w.layers.clone(),
                 cause: Some(
                     "reference-only: gateway never responded to TCP (no outage claimed)".into(),
                 ),
@@ -434,7 +434,7 @@ pub fn recover_windows(
                 store.close_window(&CloseWindow {
                     id: w.id,
                     end_ts: row.ts,
-                    layers: "unknown".into(),
+                    layers: w.layers.clone(),
                     cause: Some("recovered while daemon was stopped".into()),
                     location_class: "unknown".into(),
                     flap: false,
@@ -450,7 +450,7 @@ pub fn recover_windows(
                 store.close_window(&CloseWindow {
                     id: w.id,
                     end_ts: now,
-                    layers: "unknown".into(),
+                    layers: w.layers.clone(),
                     cause: Some("daemon stopped; no probe data".into()),
                     location_class: "unknown".into(),
                     flap: false,
@@ -706,5 +706,23 @@ mod tests {
             o[0].cause.as_deref(),
             Some("recovered while daemon was stopped")
         );
+    }
+
+    #[test]
+    fn recover_preserves_layer_attribution() {
+        let mut store = Store::open_in_memory().unwrap();
+        store.open_window("ext", 1_000).unwrap();
+        // The detector would have recorded the failing layers by now.
+        store
+            .conn
+            .execute(
+                "UPDATE outages SET layers = 'tcp+dns' WHERE target = 'ext'",
+                [],
+            )
+            .unwrap();
+        store.insert_probes(&[res("ext", true, 900)]).unwrap();
+        recover_windows(&store, Some("gw")).unwrap();
+        let o = store.outages_in(0, i64::MAX).unwrap();
+        assert_eq!(o[0].layers, "tcp+dns", "recovery must not clobber layers");
     }
 }
