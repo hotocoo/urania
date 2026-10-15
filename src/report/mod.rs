@@ -235,11 +235,10 @@ pub fn render(
         CtxMeta {
             from_ms: from,
             to_ms: to,
-            period_label: opts
-                .window
-                .is_some()
-                .then_some("absolute window")
-                .unwrap_or_else(|| opts.since.label()),
+            period_label: match opts.window {
+                Some(_) => "absolute window",
+                None => opts.since.label(),
+            },
             manifest_name,
             build_hash: crate::version::hash(),
         },
