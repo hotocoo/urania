@@ -12,6 +12,7 @@ use crate::util::now_ms;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Period {
+    H1,
     H24,
     D7,
     D30,
@@ -21,6 +22,7 @@ pub enum Period {
 impl Period {
     pub fn parse(s: &str) -> Option<Self> {
         match s {
+            "1h" => Some(Self::H1),
             "24h" => Some(Self::H24),
             "7d" => Some(Self::D7),
             "30d" => Some(Self::D30),
@@ -31,6 +33,7 @@ impl Period {
 
     pub fn label(self) -> &'static str {
         match self {
+            Self::H1 => "1h",
             Self::H24 => "24h",
             Self::D7 => "7d",
             Self::D30 => "30d",
@@ -40,6 +43,7 @@ impl Period {
 
     pub fn ms(self) -> i64 {
         match self {
+            Self::H1 => 3_600_000,
             Self::H24 => 86_400_000,
             Self::D7 => 7 * 86_400_000,
             Self::D30 => 30 * 86_400_000,
@@ -268,6 +272,23 @@ mod tests {
             latency_ms: ok.then_some(10.0),
             detail: String::new(),
         }
+    }
+
+    #[test]
+    fn period_parse_roundtrip() {
+        for (s, ms) in [
+            ("1h", 3_600_000i64),
+            ("24h", 86_400_000),
+            ("7d", 7 * 86_400_000),
+            ("30d", 30 * 86_400_000),
+            ("90d", 90 * 86_400_000),
+        ] {
+            let p = Period::parse(s).unwrap_or_else(|| panic!("parse {s}"));
+            assert_eq!(p.label(), s);
+            assert_eq!(p.ms(), ms);
+        }
+        assert_eq!(Period::parse("2h"), None);
+        assert_eq!(Period::parse("91d"), None);
     }
 
     #[test]

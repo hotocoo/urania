@@ -33,7 +33,7 @@ pub enum Cmd {
     Status,
     /// Render the evidence report (self-contained HTML, optional CSV + SHA-256 manifest)
     Report {
-        /// Period: 24h | 7d | 30d | 90d
+        /// Period: 1h | 24h | 7d | 30d | 90d
         #[arg(long, default_value = "24h")]
         since: String,
         /// Output HTML path (default: ./urania-report.html)
