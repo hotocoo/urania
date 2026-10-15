@@ -41,6 +41,8 @@ pub struct HtmlCtx {
     /// differs from the rendering build — or always, since it is the
     /// provenance of the evidence itself.
     pub collected_by: Option<String>,
+    /// Custom report title (incident label); defaults to the period label.
+    pub title: Option<String>,
 }
 
 /// Availability percentage over the rows (100.0 for empty input).
@@ -161,9 +163,11 @@ pub fn target_line(t: &TargetInfo) -> String {
 pub fn render_html(ctx: &HtmlCtx) -> String {
     let mut s = String::with_capacity(64 * 1024);
     s.push_str("<!doctype html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n");
+    // A custom title (incident label) wins over the period label.
+    let heading = ctx.title.as_deref().unwrap_or(&ctx.period_label);
     s.push_str(&format!(
         "<title>urania report — {}</title>\n",
-        esc(&ctx.period_label)
+        esc(heading)
     ));
     s.push_str(
         "<style>\n\
@@ -184,7 +188,12 @@ pub fn render_html(ctx: &HtmlCtx) -> String {
     // Header
     s.push_str("<header>\n<h1>urania v");
     s.push_str(&esc(&ctx.version));
-    s.push_str(" — network evidence report</h1>\n<dl>\n");
+    s.push_str(" — network evidence report");
+    if let Some(t) = &ctx.title {
+        s.push_str(" — ");
+        s.push_str(&esc(t));
+    }
+    s.push_str("</h1>\n<dl>\n");
     s.push_str(&format!(
         "<dt>Period</dt><dd>{} → {} ({})</dd>\n",
         fmt_ts(ctx.from_ms),
@@ -403,6 +412,7 @@ mod tests {
             manifest_name: None,
             build_hash: None,
             collected_by: None,
+            title: None,
         }
     }
 

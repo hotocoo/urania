@@ -358,6 +358,32 @@ async fn daemon_roundtrip_local_dummies() {
         "status line goes to stderr"
     );
 
+    // report --title: custom incident label in the header.
+    let rep_t = std::process::Command::new(bin)
+        .args([
+            "report",
+            "--stdout",
+            "--since",
+            "24h",
+            "--title",
+            "Incident TEST-1",
+            "--config",
+        ])
+        .arg(&cfg_path)
+        .output()
+        .unwrap();
+    assert!(rep_t.status.success(), "report --title failed");
+    let th = String::from_utf8_lossy(&rep_t.stdout);
+    assert!(
+        th.contains("urania report — Incident TEST-1"),
+        "title in <title>"
+    );
+    assert!(
+        th.contains("network evidence report — Incident TEST-1"),
+        "title in <h1>"
+    );
+    assert!(th.contains("<dt>Period</dt>"), "period still shown");
+
     // report --since + --from: mutually exclusive, explicit error.
     let conflict = std::process::Command::new(bin)
         .args([

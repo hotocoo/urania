@@ -62,6 +62,8 @@ pub struct ReportOpts {
     pub manifest: bool,
     /// Print the HTML to stdout instead of writing out_html.
     pub stdout: bool,
+    /// Custom report title (incident label).
+    pub title: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -91,6 +93,8 @@ struct CtxMeta<'a> {
     manifest_name: Option<String>,
     /// Build commit for provenance (header + footer), if the build had git.
     build_hash: Option<&'a str>,
+    /// Custom report title (incident label); defaults to the period label.
+    title: Option<&'a str>,
 }
 
 /// Build the full HTML context from the store (shared by `report` and `selftest`).
@@ -115,6 +119,7 @@ pub fn build_ctx(
             period_label,
             manifest_name,
             build_hash: crate::version::hash(),
+            title: None,
         },
     )
 }
@@ -135,6 +140,7 @@ fn build_ctx_fetched(
         period_label,
         manifest_name,
         build_hash,
+        title,
     } = meta;
     let names: Vec<&str> = cfg.targets.iter().map(|t| t.name.as_str()).collect();
     let mut per_target: Vec<Vec<ProbeRow>> = vec![Vec::new(); cfg.targets.len()];
@@ -177,6 +183,7 @@ fn build_ctx_fetched(
         manifest_name,
         build_hash: build_hash.map(str::to_string),
         collected_by,
+        title: title.map(str::to_string),
     })
 }
 
@@ -243,6 +250,7 @@ pub fn render(
             },
             manifest_name,
             build_hash: crate::version::hash(),
+            title: opts.title.as_deref(),
         },
     )?;
     let html_text = html::render_html(&ctx);
@@ -358,6 +366,7 @@ mod tests {
                 period_label: "test",
                 manifest_name: None,
                 build_hash: None,
+                title: None,
             },
         )
         .unwrap();

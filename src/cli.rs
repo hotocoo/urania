@@ -65,6 +65,10 @@ pub enum Cmd {
         /// files on disk, so clap rejects the combination
         #[arg(long, conflicts_with_all = ["csv", "manifest"])]
         stdout: bool,
+        /// Custom report title (e.g. an incident label) shown in the
+        /// header; the period is always shown separately
+        #[arg(long)]
+        title: Option<String>,
     },
     /// Verify a report against its SHA-256 manifest (evidence integrity)
     Verify {

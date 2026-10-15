@@ -74,6 +74,7 @@ async fn run(cli: cli::Cli) -> i32 {
             csv,
             manifest,
             stdout,
+            title,
         } => {
             // --since (trailing period) and --from (absolute window) are
             // mutually exclusive: guessing which the user meant would
@@ -125,6 +126,7 @@ async fn run(cli: cli::Cli) -> i32 {
                 out_csv: csv.clone(),
                 manifest: *manifest,
                 stdout: *stdout,
+                title: title.clone(),
             };
             let store = match store::Store::open(&config::db_path(&cfg)) {
                 Ok(s) => s,

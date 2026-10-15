@@ -140,6 +140,10 @@ All notable changes to urania are documented here.
   `report --stdout > r.html` is clean. The evidence chain
   (--csv/--manifest) needs files on disk, so clap rejects
   the combination.
+- CLI: `report --title "Incident …"` — a custom report
+  title (incident label) in the header; the period is
+  always shown separately, so the evidence window is never
+  hidden by the label.
 - Config: fail-fast validation for an empty target list, whitespace-only
   target names, and ICMP endpoints containing whitespace (previously
   accepted, then logged silence or failed obscurely at probe time).

@@ -97,6 +97,7 @@ urania once --quiet     # silent on success (exit code only); failures still pri
 urania config --json    # machine-readable effective config (auditing, CMDB)
 urania report --since 24h --to report.html
 urania report --stdout           # HTML to stdout (CI logs); status line on stderr
+urania report --title "Incident 2026-10-16: ISP outage" --to report.html
 urania report --since 30d --to report.html --csv report.csv --manifest
 urania report --from 2026-10-15T08:00:00+08:00 --end 2026-10-15T14:00:00+08:00
                           # absolute incident window (RFC3339; --end defaults to now)
