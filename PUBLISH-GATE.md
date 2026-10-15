@@ -24,8 +24,9 @@ before publishing. Performed 2026-10-15.
 
 ## 3. Blockers / decisions for the owner
 
-1. **GitHub repo** — create `hotocoo/urania` (or preferred org) and push;
-   the CI + release workflows are ready.
+1. **GitHub repo** — done 2026-10-15: [hotocoo/urania](https://github.com/hotocoo/urania)
+   created, `main` pushed, CI green (fmt + clippy + test, ubuntu + macOS,
+   plus a static-musl job asserting `file` reports statically linked).
 2. **Publish channel** — prebuilt static binaries via GitHub Releases are the
    primary channel (no account needed beyond GitHub). `cargo publish` to
    crates.io is optional for this product (it's a binary, not a library);
@@ -39,4 +40,5 @@ before publishing. Performed 2026-10-15.
 - [x] icmp feature live-verified (2026-10-15: 9.0ms RTT to 1.1.1.1, unprivileged macOS)
 - [~] 24h soak (T7) — started 2026-10-15 21:19:55 +08 (pid 70840); automated verification scheduled 2026-10-16 21:35 +08 (DSH automation `urania 24h soak verification`)
 - [ ] trademark search (before commercial distribution)
-- [ ] repo + first release (owner: create `hotocoo/urania`, `git remote add origin … && git push -u origin main`)
+- [x] repo (2026-10-15: `hotocoo/urania` created, `main` pushed, CI green)
+- [ ] first release (tag `v0.1.0` after the soak passes → 4 static binaries + SHA256SUMS via the release workflow)

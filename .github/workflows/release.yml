@@ -27,6 +27,11 @@ jobs:
       # zigbuild provides the C cross-compiler + linker for both musl
       # targets (the bundled SQLite C source needs one; a plain
       # `cargo build` cannot cross to aarch64-musl on an x86_64 runner).
+      - name: Install zig
+        if: contains(matrix.target, 'musl')
+        uses: mlugg/setup-zig@v2
+        with:
+          version: 0.17.0
       - name: Install cargo-zigbuild
         if: contains(matrix.target, 'musl')
         run: |
