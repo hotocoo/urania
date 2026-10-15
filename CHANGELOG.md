@@ -61,6 +61,13 @@ All notable changes to urania are documented here.
 - Provenance: the report header/footer, the db `tool_version` meta,
   and `status`/`config` now record the exact build (version + git
   commit, via build.rs; version alone when built without git).
+- Provenance (report): the header now also shows which build collected
+  the data (Collected by, from the db tool_version meta) — matters
+  after an upgrade: data written by one build, rendered by another,
+  is labeled as such.
+- Config: fail-fast validation for an empty target list, whitespace-only
+  target names, and ICMP endpoints containing whitespace (previously
+  accepted, then logged silence or failed obscurely at probe time).
 - Daemon: single-instance flock + pidfile (no stale-lock states), graceful
   SIGTERM stop, daily log rotation (keep 2), `start|stop|status|once|report|verify|config|selftest`;
   `start` polls for the pidfile up to 5 s instead of one fixed 500 ms wait,
