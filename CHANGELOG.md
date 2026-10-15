@@ -144,6 +144,13 @@ All notable changes to urania are documented here.
   title (incident label) in the header; the period is
   always shown separately, so the evidence window is never
   hidden by the label.
+- Report: the outage count for a period now uses overlap
+  semantics — a window counts if it started before the
+  period's end and is still open or ended inside it.
+  Previously only windows that *started* inside the period
+  counted, so an outage that began before the period and is
+  still running (the one that matters most) was missing
+  from the report.
 - Config: fail-fast validation for an empty target list, whitespace-only
   target names, and ICMP endpoints containing whitespace (previously
   accepted, then logged silence or failed obscurely at probe time).

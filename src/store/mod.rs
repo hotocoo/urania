@@ -239,10 +239,16 @@ impl Store {
         Ok(out)
     }
 
+    /// Windows overlapping [from_ms, to_ms]: a window counts if it started
+    /// before the window's end and is either still open or ended inside it.
+    /// (Start-in-period would miss an outage that began before the period
+    /// and is still running — the one that matters most.)
     pub fn outages_in(&self, from_ms: i64, to_ms: i64) -> anyhow::Result<Vec<OutageRow>> {
         let mut stmt = self.conn.prepare(
             "SELECT start_ts, end_ts, target, layers, cause, location_class, flap
-             FROM outages WHERE start_ts >= ?1 AND start_ts <= ?2 ORDER BY start_ts",
+             FROM outages
+             WHERE start_ts <= ?2 AND (end_ts IS NULL OR end_ts >= ?1)
+             ORDER BY start_ts",
         )?;
         let rows = stmt.query_map(params![from_ms, to_ms], map_outage_row)?;
         let mut out = Vec::new();
@@ -326,5 +332,35 @@ mod tests {
         assert_eq!(store.probe_counts_since("b", 4_000).unwrap(), Some((0, 1)));
         assert_eq!(store.probe_counts_since("a", 10_000).unwrap(), None);
         assert_eq!(store.probe_counts_since("missing", 0).unwrap(), None);
+    }
+
+    #[test]
+    fn outages_in_uses_overlap_semantics() {
+        let store = Store::open_in_memory().unwrap();
+        // Three windows: closed before the period, overlapping (started
+        // before, closed inside), still open.
+        store
+            .conn
+            .execute(
+                "INSERT INTO outages(start_ts, end_ts, target, layers, probes_failed) VALUES
+                 (100, 200, 'old', '', 0), (800, 5000, 'span', '', 0), (7000, NULL, 'open', '', 0)",
+                [],
+            )
+            .unwrap();
+        // Period [4000, 6000]: only 'span' overlaps ('old' ended before,
+        // 'open' starts after).
+        let o = store.outages_in(4_000, 6_000).unwrap();
+        let names: Vec<&str> = o.iter().map(|w| w.target.as_str()).collect();
+        assert_eq!(names, vec!["span"]);
+        // Period [4000, 8000]: 'span' and the still-open 'open'.
+        let o = store.outages_in(4_000, 8_000).unwrap();
+        let names: Vec<&str> = o.iter().map(|w| w.target.as_str()).collect();
+        assert_eq!(names, vec!["span", "open"]);
+        // Period [0, i64::MAX]: everything.
+        assert_eq!(store.outages_in(0, i64::MAX).unwrap().len(), 3);
+        // Period after all starts: only the open window.
+        let o = store.outages_in(8_000, 9_000).unwrap();
+        assert_eq!(o.len(), 1);
+        assert_eq!(o[0].target, "open");
     }
 }
