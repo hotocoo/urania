@@ -156,6 +156,8 @@ fn build_ctx_fetched(
         });
     }
     let clock_note = store.get_meta("clock_note")?;
+    // Provenance of the data itself: which build wrote the probes.
+    let collected_by = store.get_meta("tool_version")?;
     Ok(html::HtmlCtx {
         version: env!("CARGO_PKG_VERSION").to_string(),
         from_ms,
@@ -170,6 +172,7 @@ fn build_ctx_fetched(
         retention_days: cfg.retention_days,
         manifest_name,
         build_hash: build_hash.map(str::to_string),
+        collected_by,
     })
 }
 
