@@ -201,7 +201,7 @@ async fn run(cli: cli::Cli) -> i32 {
                 }
             }
         }
-        cli::Cmd::Config => {
+        cli::Cmd::Config { json } => {
             // Where the config came from: explicit --config, the default
             // path if present, else built-in defaults.
             let source = match &cli.config {
@@ -215,6 +215,36 @@ async fn run(cli: cli::Cli) -> i32 {
                     }
                 }
             };
+            if *json {
+                let targets: Vec<serde_json::Value> = cfg
+                    .targets
+                    .iter()
+                    .map(|t| {
+                        serde_json::json!({
+                            "name": t.name,
+                            "type": t.probe_type.to_string(),
+                            "endpoint": t.endpoint,
+                            "interval_s": t.interval,
+                            "timeout_s": t.timeout,
+                        })
+                    })
+                    .collect();
+                println!(
+                    "{}",
+                    serde_json::json!({
+                        "version": version::full(),
+                        "config": source,
+                        "db": config::db_path(&cfg).to_string_lossy().to_string(),
+                        "log_dir": config::log_dir(&cfg).to_string_lossy().to_string(),
+                        "lock": config::lock_path(&cfg).to_string_lossy().to_string(),
+                        "fail_threshold": cfg.fail_threshold,
+                        "retention_days": cfg.retention_days,
+                        "icmp": cfg.icmp,
+                        "targets": targets,
+                    })
+                );
+                return 0;
+            }
             println!("urania v{}", version::full());
             println!("  config:    {source}");
             println!("  db:        {}", config::db_path(&cfg).display());

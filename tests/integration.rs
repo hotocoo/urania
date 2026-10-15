@@ -292,6 +292,25 @@ async fn daemon_roundtrip_local_dummies() {
         "tcp-local ok result: {out}"
     );
 
+    // config --json: the effective config, machine-readable.
+    let cfg_json = std::process::Command::new(bin)
+        .args(["config", "--json", "--config"])
+        .arg(&cfg_path)
+        .output()
+        .unwrap();
+    let cout = String::from_utf8_lossy(&cfg_json.stdout);
+    assert!(cfg_json.status.success(), "config --json failed: {cout}");
+    let cj: serde_json::Value = serde_json::from_str(&cout)
+        .unwrap_or_else(|e| panic!("config --json not valid JSON: {e}: {cout}"));
+    assert_eq!(cj["config"], cfg_path.to_string_lossy().to_string());
+    let ctargets = cj["targets"].as_array().unwrap();
+    assert!(
+        ctargets
+            .iter()
+            .any(|t| t["name"] == "tcp-local" && t["interval_s"].is_number()),
+        "tcp-local with interval: {cout}"
+    );
+
     tcp_task.abort();
     http_task.abort();
     let _ = std::fs::remove_dir_all(&dir);

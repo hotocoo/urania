@@ -101,6 +101,9 @@ All notable changes to urania are documented here.
   (previously only on a detector command or at 100 rows — with
   long probe intervals that was hours of unflushed evidence on
   a crash). Bounded data loss: ≤5 s of probes.
+- CLI: `config --json` — the effective configuration
+  (source, db/log/lock paths, thresholds, all targets) as
+  machine-readable JSON for config management and auditing.
 - Config: fail-fast validation for an empty target list, whitespace-only
   target names, and ICMP endpoints containing whitespace (previously
   accepted, then logged silence or failed obscurely at probe time).

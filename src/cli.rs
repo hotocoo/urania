@@ -84,7 +84,11 @@ pub enum Cmd {
         json: bool,
     },
     /// Show the effective configuration (resolved file + built-in defaults)
-    Config,
+    Config {
+        /// Machine-readable JSON for config management/auditing
+        #[arg(long)]
+        json: bool,
+    },
     /// Round-trip self-test against known-good targets
     Selftest,
     /// Hidden: the real daemon loop (systemd / Docker)
