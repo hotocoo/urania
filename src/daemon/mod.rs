@@ -189,17 +189,30 @@ pub fn status(cfg: &Config, check: bool) -> i32 {
     let db_path = config::db_path(cfg);
 
     let uptime = if let Some(pid) = running_pid {
-        Store::open(&db_path)
+        // The daemon build comes from the db (written by the daemon at
+        // startup) — it can differ from this CLI's own version after an
+        // upgrade, and the difference is information.
+        let (started, tool_version) = Store::open(&db_path)
             .ok()
-            .and_then(|s| s.get_meta("daemon_started_at").ok().flatten())
-            .and_then(|v| parse_iso(&v))
-            .map(|started| {
-                format!(
-                    " (pid {pid}, uptime {})",
-                    fmt_duration(now_ms().saturating_sub(started))
+            .map(|s| {
+                (
+                    s.get_meta("daemon_started_at").ok().flatten(),
+                    s.get_meta("tool_version").ok().flatten(),
                 )
             })
-            .unwrap_or_else(|| format!(" (pid {pid})"))
+            .unwrap_or((None, None));
+        let mut line = format!(" (pid {pid}");
+        if let Some(started) = started.as_deref().and_then(parse_iso) {
+            line.push_str(&format!(
+                ", uptime {}",
+                fmt_duration(now_ms().saturating_sub(started))
+            ));
+        }
+        if let Some(v) = tool_version {
+            line.push_str(&format!(", daemon build {v}"));
+        }
+        line.push(')');
+        line
     } else {
         "no".into()
     };

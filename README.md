@@ -103,6 +103,30 @@ location, flap), footer (generator + optional SHA-256 manifest name).
   `urania verify report.html` re-checks it — attach the `.sha256` file with
   the report so the recipient can prove it was not altered in transit.
 
+## How the evidence holds up
+
+Every element of the chain is independently checkable by a recipient:
+
+- **Integrity** — `urania verify report.html` re-hashes the report (+ CSV)
+  against the manifest: proof the artifact was not altered after
+  generation.
+- **Provenance** — the header states the build that rendered the report
+  (Build) and the build that collected the data (Collected by); the
+  database itself records the collector's build. "Which tool produced
+  this?" is answerable from the artifact alone.
+- **Completeness** — the summary's Coverage column states probes recorded
+  vs expected (interval × period) and Observed states first → last probe
+  per target. Gaps (sleep, suspend, stop) are declared, not hidden.
+- **Clock honesty** — each probe stores wall time plus the monotonic
+  delta since the previous probe; the report flags probes whose delta
+  deviates >10% from the expected interval (possible clock adjustment).
+- **Honest silence** — a gateway that has never answered TCP is a
+  reference probe: its silence is recorded without an outage claim, and
+  the report says so (`ref-only`).
+- **Method** — the header states exactly what was measured (targets,
+  resolvers, endpoints, intervals, timeouts); the same config reproduces
+  it.
+
 ## Configuration
 
 `~/.config/urania/config.toml` (create it to override; missing file =

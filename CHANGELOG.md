@@ -71,6 +71,13 @@ All notable changes to urania are documented here.
 - CLI: `urania once --json` — machine-readable one-shot output
   (ts, all_ok, per-target ok/latency/detail) for scripts; the
   table output is unchanged.
+- CLI: `status` now shows the daemon build (from the db) on the
+  running line — after an upgrade the CLI version and the
+  collecting daemon version can differ, and the difference is
+  now visible.
+- Docs: README "How the evidence holds up" — what a recipient can
+  independently check (integrity, provenance, completeness, clock
+  honesty, honest silence, method).
 - Config: fail-fast validation for an empty target list, whitespace-only
   target names, and ICMP endpoints containing whitespace (previously
   accepted, then logged silence or failed obscurely at probe time).
