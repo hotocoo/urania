@@ -27,3 +27,31 @@ jobs:
         run: cargo clippy --all-targets --all-features -- -D warnings
       - name: test
         run: cargo test --all-features
+
+  # Acceptance criterion 4: the musl builds must be fully static. Enforced
+  # on every push, not just at release time.
+  static-musl:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-musl, aarch64-unknown-linux-musl
+      - uses: Swatinem/rust-cache@v2
+      - name: Install cargo-zigbuild
+        run: |
+          curl -sSfL https://github.com/rust-cross/cargo-zigbuild/releases/latest/download/cargo-zigbuild-installer.sh | sh
+      - name: Build musl targets
+        run: |
+          cargo zigbuild --release --target x86_64-unknown-linux-musl
+          cargo zigbuild --release --target aarch64-unknown-linux-musl
+      - name: Assert statically linked
+        run: |
+          file target/x86_64-unknown-linux-musl/release/urania
+          file target/aarch64-unknown-linux-musl/release/urania
+          file target/x86_64-unknown-linux-musl/release/urania | grep -q "statically linked"
+          file target/aarch64-unknown-linux-musl/release/urania | grep -q "statically linked"
+      - name: Smoke test (x86_64)
+        run: |
+          ./target/x86_64-unknown-linux-musl/release/urania --version
+          ./target/x86_64-unknown-linux-musl/release/urania selftest

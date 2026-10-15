@@ -24,8 +24,20 @@ jobs:
       - name: Install musl target
         if: contains(matrix.target, 'musl')
         run: rustup target add ${{ matrix.target }}
+      # zigbuild provides the C cross-compiler + linker for both musl
+      # targets (the bundled SQLite C source needs one; a plain
+      # `cargo build` cannot cross to aarch64-musl on an x86_64 runner).
+      - name: Install cargo-zigbuild
+        if: contains(matrix.target, 'musl')
+        run: |
+          curl -sSfL https://github.com/rust-cross/cargo-zigbuild/releases/latest/download/cargo-zigbuild-installer.sh | sh
       - name: Build
-        run: cargo build --release --target ${{ matrix.target }}
+        run: |
+          if [[ "${{ matrix.target }}" == *musl* ]]; then
+            cargo zigbuild --release --target ${{ matrix.target }}
+          else
+            cargo build --release --target ${{ matrix.target }}
+          fi
       - name: Package
         run: |
           tar czf urania-${{ github.ref_name }}-${{ matrix.target }}.tar.gz \
