@@ -163,6 +163,13 @@ All notable changes to urania are documented here.
   (e.g. `tcp+dns`). Previously the recovery close paths
   overwrote it with `unknown`, losing evidence of which
   layers had failed.
+- Release: `SHA256SUMS` now lists bare tarball filenames
+  instead of `artifacts/<target>/` paths. The README's
+  verify-first step (`sha256sum -c SHA256SUMS
+  --ignore-missing`) would otherwise see every line as
+  "missing" and pass silently — verifying nothing. Now the
+  downloaded tarball is actually checked, and a tampered
+  file still fails.
 - Config: fail-fast validation for an empty target list, whitespace-only
   target names, and ICMP endpoints containing whitespace (previously
   accepted, then logged silence or failed obscurely at probe time).

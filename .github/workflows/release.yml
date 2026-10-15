@@ -74,9 +74,14 @@ jobs:
           path: artifacts
       # Checksums over the released tarballs (each contains a binary
       # named `urania`, so per-binary hashes would be indistinguishable).
+      # Bare filenames: the user downloads flat files, so
+      # `sha256sum -c SHA256SUMS --ignore-missing` must match them. With
+      # the `artifacts/<target>/` prefix every line is "missing" and
+      # --ignore-missing passes silently, verifying nothing.
       - name: Checksums
         run: |
-          find artifacts -name '*.tar.gz' | sort | xargs sha256sum > SHA256SUMS
+          find artifacts -name '*.tar.gz' -print0 | sort -z | \
+            xargs -0 sha256sum | sed 's|artifacts/[^/]*/||' > SHA256SUMS
           cat SHA256SUMS
       - uses: softprops/action-gh-release@v2
         with:
