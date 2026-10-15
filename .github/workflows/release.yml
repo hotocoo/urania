@@ -43,19 +43,23 @@ jobs:
           else
             cargo build --release --target ${{ matrix.target }}
           fi
+      # Only the x86_64-musl binary can execute on the ubuntu runners;
+      # the aarch64-musl and darwin legs are verified by CI + the static
+      # link check there.
+      - name: Smoke test (x86_64-musl)
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        run: ./target/x86_64-unknown-linux-musl/release/urania --version
       - name: Package
         run: |
-          tar czf urania-${{ github.ref_name }}-${{ matrix.target }}.tar.gz \
-            -C target/${{ matrix.target }}/release urania
-          # sha256sum is absent on macOS runners; fall back to shasum.
-          (cd target/${{ matrix.target }}/release \
-            && (sha256sum urania 2>/dev/null || shasum -a 256 urania) > urania.sha256)
+          STAGE=target/release-stage
+          rm -rf "$STAGE" && mkdir -p "$STAGE"
+          cp target/${{ matrix.target }}/release/urania "$STAGE/"
+          cp LICENSE "$STAGE/"
+          tar czf urania-${{ github.ref_name }}-${{ matrix.target }}.tar.gz -C "$STAGE" urania LICENSE
       - uses: actions/upload-artifact@v4
         with:
           name: urania-${{ matrix.target }}
-          path: |
-            urania-${{ github.ref_name }}-${{ matrix.target }}.tar.gz
-            target/${{ matrix.target }}/release/urania.sha256
+          path: urania-${{ github.ref_name }}-${{ matrix.target }}.tar.gz
   publish:
     needs: build
     permissions:
@@ -65,9 +69,11 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
+      # Checksums over the released tarballs (each contains a binary
+      # named `urania`, so per-binary hashes would be indistinguishable).
       - name: Checksums
         run: |
-          find artifacts -name '*.sha256' -exec cat {} \; > SHA256SUMS
+          find artifacts -name '*.tar.gz' | sort | xargs sha256sum > SHA256SUMS
           cat SHA256SUMS
       - uses: softprops/action-gh-release@v2
         with:
