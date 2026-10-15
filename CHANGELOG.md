@@ -78,6 +78,9 @@ All notable changes to urania are documented here.
 - Docs: README "How the evidence holds up" — what a recipient can
   independently check (integrity, provenance, completeness, clock
   honesty, honest silence, method).
+- Report: per-target latency line gains p50 / p95 / p99
+  (nearest-rank over successful probes) — "normal" vs
+  "incident" latency in one line.
 - Config: fail-fast validation for an empty target list, whitespace-only
   target names, and ICMP endpoints containing whitespace (previously
   accepted, then logged silence or failed obscurely at probe time).

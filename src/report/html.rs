@@ -67,6 +67,19 @@ pub fn latency_stats(rows: &[ProbeRow]) -> (f64, f64, f64, f64) {
     (avg, min, max, jitter)
 }
 
+/// Nearest-rank percentile (0–100) over successful latencies; 0.0 if none.
+pub fn latency_percentile(rows: &[ProbeRow], pct: f64) -> f64 {
+    let mut lats: Vec<f64> = rows.iter().filter_map(|r| r.latency_ms).collect();
+    if lats.is_empty() {
+        return 0.0;
+    }
+    lats.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    let rank = (pct.clamp(0.0, 100.0) / 100.0 * lats.len() as f64)
+        .ceil()
+        .max(1.0) as usize;
+    lats[rank - 1]
+}
+
 /// Count rows whose monotonic delta deviates >10% from the expected interval
 /// (possible clock adjustment while running).
 pub fn drift_count(rows: &[ProbeRow], expected_ms: i64) -> usize {
@@ -286,8 +299,13 @@ pub fn render_html(ctx: &HtmlCtx) -> String {
             s.push('\n');
         }
         let (avg, min, max, jitter) = latency_stats(&td.rows);
+        // Percentiles: "normal" vs "incident" latency in one line —
+        // the number an ISP dispute actually needs.
+        let p50 = latency_percentile(&td.rows, 50.0);
+        let p95 = latency_percentile(&td.rows, 95.0);
+        let p99 = latency_percentile(&td.rows, 99.0);
         s.push_str(&format!(
-            "<p>latency avg {avg:.1}ms · min {min:.1}ms · max {max:.1}ms · jitter {jitter:.1}ms</p>\n"
+            "<p>latency avg {avg:.1}ms · p50 {p50:.1}ms · p95 {p95:.1}ms · p99 {p99:.1}ms · min {min:.1}ms · max {max:.1}ms · jitter {jitter:.1}ms</p>\n"
         ));
         let drift = drift_count(&td.rows, info.interval as i64 * 1000);
         if drift > 0 {
@@ -399,6 +417,11 @@ mod tests {
         assert!(min > 0.0 && min <= avg && avg <= max);
         assert!(jitter >= 0.0);
         assert_eq!(availability_pct(&[]), 100.0);
+        // 90 successful lats: 18 each of 10,11,12,13,14 (nearest-rank).
+        assert_eq!(latency_percentile(&rows, 50.0), 12.0);
+        assert_eq!(latency_percentile(&rows, 95.0), 14.0);
+        assert_eq!(latency_percentile(&rows, 99.0), 14.0);
+        assert_eq!(latency_percentile(&[], 50.0), 0.0);
     }
 
     #[test]
