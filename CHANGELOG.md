@@ -48,8 +48,12 @@ All notable changes to urania are documented here.
   thresholds, and every target with type/endpoint/interval/timeout).
   README documents the override semantics: a config file with any
   `[[target]]` entries replaces the built-in targets, it does not merge.
+- Release: `SHA256SUMS` now covers the released tarballs (per-binary
+  sums were indistinguishable — all binaries are named `urania`);
+  tarballs include `LICENSE`; the x86_64-musl artifact is smoke-tested
+  before packaging.
 - Daemon: single-instance flock + pidfile (no stale-lock states), graceful
-  SIGTERM stop, daily log rotation (keep 2), `start|stop|status|once|report|verify|selftest`;
+  SIGTERM stop, daily log rotation (keep 2), `start|stop|status|once|report|verify|config|selftest`;
   `start` polls for the pidfile up to 5 s instead of one fixed 500 ms wait,
   so a slow cold start is not misreported as a failure. `status` shows
   per-target availability over the last hour (reference-only gateways show
