@@ -95,7 +95,12 @@ pub enum Cmd {
         json: bool,
     },
     /// Round-trip self-test against known-good targets
-    Selftest,
+    Selftest {
+        /// No network: use a local TCP dummy instead of external targets
+        /// (air-gapped installs)
+        #[arg(long)]
+        offline: bool,
+    },
     /// Hidden: the real daemon loop (systemd / Docker)
     #[command(hide = true)]
     Run {

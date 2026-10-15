@@ -89,6 +89,7 @@ urania report --from 2026-10-15T08:00:00+08:00 --end 2026-10-15T14:00:00+08:00
 urania verify report.html   # check the report against report.html.sha256
 urania config           # show the effective config (file + resolved paths + targets)
 urania selftest         # round-trip check against known-good targets
+urania selftest --offline # no network: local TCP dummy (air-gapped installs)
 ```
 
 Exit codes: `once`/`selftest` 0 = all ok, 1 = any failure; `start` 2 =

@@ -9,37 +9,60 @@ use crate::probe::{self, Probe};
 use crate::report::{build_ctx, csv, html, manifest};
 use crate::store::Store;
 
-pub async fn run() -> anyhow::Result<i32> {
+pub async fn run(offline: bool) -> anyhow::Result<i32> {
     let temp = std::env::temp_dir().join(format!("urania-selftest-{}", std::process::id()));
     std::fs::create_dir_all(&temp)?;
     let db_path = temp.join("selftest.db");
     let _ = std::fs::remove_file(&db_path);
 
-    let targets = vec![
-        Target {
-            name: "st-dns".into(),
-            probe_type: ProbeType::Dns,
-            endpoint: "1.1.1.1".into(),
-            interval: 5,
-            timeout: 5,
-        },
-        Target {
-            name: "st-tcp".into(),
+    let targets: Vec<Target> = if offline {
+        // Air-gapped: a local TCP dummy on an ephemeral port. The
+        // accept loop keeps the listener alive for the probe round
+        // (connections are dropped immediately).
+        let listener = std::net::TcpListener::bind("127.0.0.1:0")?;
+        let port = listener.local_addr()?.port();
+        std::thread::spawn(move || for _ in listener.incoming() {});
+        vec![Target {
+            name: "st-tcp-local".into(),
             probe_type: ProbeType::Tcp,
-            endpoint: "1.1.1.1:443".into(),
+            endpoint: format!("127.0.0.1:{port}"),
             interval: 5,
             timeout: 5,
-        },
-        Target {
-            name: "st-http".into(),
-            probe_type: ProbeType::Http,
-            endpoint: "https://connectivitycheck.gstatic.com/generate_204".into(),
-            interval: 10,
-            timeout: 10,
-        },
-    ];
+        }]
+    } else {
+        vec![
+            Target {
+                name: "st-dns".into(),
+                probe_type: ProbeType::Dns,
+                endpoint: "1.1.1.1".into(),
+                interval: 5,
+                timeout: 5,
+            },
+            Target {
+                name: "st-tcp".into(),
+                probe_type: ProbeType::Tcp,
+                endpoint: "1.1.1.1:443".into(),
+                interval: 5,
+                timeout: 5,
+            },
+            Target {
+                name: "st-http".into(),
+                probe_type: ProbeType::Http,
+                endpoint: "https://connectivitycheck.gstatic.com/generate_204".into(),
+                interval: 10,
+                timeout: 10,
+            },
+        ]
+    };
 
-    println!("urania selftest: probing known-good targets…");
+    println!(
+        "urania selftest: probing {}…",
+        if offline {
+            "local dummy (offline)"
+        } else {
+            "known-good targets"
+        }
+    );
     let probes: Vec<Arc<dyn Probe>> = targets
         .iter()
         .filter_map(|t| probe::build_probe(t, &None))

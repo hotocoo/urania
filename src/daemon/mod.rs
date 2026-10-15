@@ -611,7 +611,12 @@ pub async fn run_foreground(cfg: &Config) -> anyhow::Result<i32> {
         let _ = apply_cmd(&store, &cmd);
     }
     if !batch.is_empty() {
-        let _ = store.insert_probes(&batch);
+        let n = batch.len();
+        if let Err(e) = store.insert_probes(&batch) {
+            tracing::error!("shutdown flush failed: {e}");
+        } else {
+            tracing::info!("shutdown: flushed {n} probe row(s)");
+        }
     }
     store.set_meta("daemon_stopped_at", &now_iso())?;
     drop(tx); // close the channel → scheduler tasks exit

@@ -284,7 +284,7 @@ async fn run(cli: cli::Cli) -> i32 {
             )
             .await
         }
-        cli::Cmd::Selftest => match selftest::run().await {
+        cli::Cmd::Selftest { offline } => match selftest::run(*offline).await {
             Ok(code) => code,
             Err(e) => {
                 eprintln!("urania: {e}");

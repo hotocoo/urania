@@ -324,6 +324,18 @@ async fn daemon_roundtrip_local_dummies() {
         String::from_utf8_lossy(&once_q.stdout)
     );
 
+    // selftest --offline: full evidence chain without network.
+    let st_off = std::process::Command::new(bin)
+        .args(["selftest", "--offline"])
+        .output()
+        .unwrap();
+    assert!(
+        st_off.status.success(),
+        "selftest --offline failed: {}",
+        String::from_utf8_lossy(&st_off.stdout)
+    );
+    assert!(String::from_utf8_lossy(&st_off.stdout).contains("selftest: PASS"));
+
     // report --since + --from: mutually exclusive, explicit error.
     let conflict = std::process::Command::new(bin)
         .args([
