@@ -1,0 +1,6 @@
+/target
+*.log
+.DS_Store
+urania-report.html
+urania-report.csv
+urania-report.html.sha256

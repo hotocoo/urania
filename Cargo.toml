@@ -1,0 +1,43 @@
+[package]
+name = "urania"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "Headless, zero-permission network outage evidence logger: probes DNS/TCP/HTTP, logs to SQLite, renders an attachable self-contained HTML report."
+keywords = ["network", "monitoring", "outage", "diagnostics", "isp"]
+categories = ["network-programming", "command-line-utilities"]
+repository = "https://github.com/hotocoo/urania"
+readme = "README.md"
+
+[features]
+default = []
+icmp = ["dep:ping"]
+
+[dependencies]
+anyhow = "1"
+async-trait = "0.1"
+clap = { version = "4", features = ["derive"] }
+chrono = { version = "0.4", features = ["serde"] }
+csv = "1"
+fs2 = "0.4"
+libc = "0.2"
+ping = { version = "0.10", optional = true }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "http2"] }
+rusqlite = { version = "0.32", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+sha2 = "0.10"
+thiserror = "2"
+toml = "0.8"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "net", "signal", "process", "io-util", "fs"] }
+tracing = "0.1"
+tracing-appender = "0.2"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+url = "2"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "net", "io-util"] }
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true

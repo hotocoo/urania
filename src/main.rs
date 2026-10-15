@@ -1,0 +1,197 @@
+//! urania: headless, zero-permission network outage evidence logger.
+
+mod cli;
+mod config;
+mod daemon;
+mod detect;
+mod probe;
+mod report;
+mod selftest;
+mod store;
+mod util;
+
+use std::sync::Arc;
+
+use clap::Parser;
+
+#[tokio::main]
+async fn main() {
+    let cli = cli::Cli::parse();
+    let code = run(cli).await;
+    std::process::exit(code);
+}
+
+async fn run(cli: cli::Cli) -> i32 {
+    let foreground = matches!(
+        &cli.cmd,
+        cli::Cmd::Start { foreground: true } | cli::Cmd::Run { foreground: true }
+    );
+    if !foreground {
+        daemon::log::init_stderr();
+    }
+    let cfg = match config::load(cli.config.as_deref()) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("urania: {e}");
+            return 1;
+        }
+    };
+    match &cli.cmd {
+        cli::Cmd::Start { foreground } => {
+            if *foreground {
+                match daemon::run_foreground(&cfg).await {
+                    Ok(code) => code,
+                    Err(e) => {
+                        eprintln!("urania: {e}");
+                        1
+                    }
+                }
+            } else {
+                daemon::start(&cfg, cli.config.as_deref())
+            }
+        }
+        cli::Cmd::Run { foreground } => {
+            if !*foreground {
+                eprintln!("urania run requires --foreground");
+                return 1;
+            }
+            match daemon::run_foreground(&cfg).await {
+                Ok(code) => code,
+                Err(e) => {
+                    eprintln!("urania: {e}");
+                    1
+                }
+            }
+        }
+        cli::Cmd::Stop => daemon::stop(&cfg),
+        cli::Cmd::Status => daemon::status(&cfg),
+        cli::Cmd::Report {
+            since,
+            to,
+            csv,
+            manifest,
+        } => {
+            let period = match report::Period::parse(since) {
+                Some(p) => p,
+                None => {
+                    eprintln!("urania: --since must be 24h | 7d | 30d | 90d");
+                    return 1;
+                }
+            };
+            let out_html = to
+                .clone()
+                .unwrap_or_else(|| std::path::PathBuf::from("urania-report.html"));
+            let opts = report::ReportOpts {
+                since: period,
+                out_html,
+                out_csv: csv.clone(),
+                manifest: *manifest,
+            };
+            let store = match store::Store::open(&config::db_path(&cfg)) {
+                Ok(s) => s,
+                Err(e) => {
+                    eprintln!("urania: {e}");
+                    return 1;
+                }
+            };
+            match report::render(&cfg, &store, &opts) {
+                Ok(summary) => {
+                    println!(
+                        "report: {} ({} probes, {} outages)",
+                        summary.html.display(),
+                        summary.probes,
+                        summary.outages
+                    );
+                    if let Some(c) = &summary.csv {
+                        println!("csv:      {}", c.display());
+                    }
+                    if let Some(m) = &summary.manifest {
+                        println!("manifest: {}", m.display());
+                    }
+                    0
+                }
+                Err(report::ReportError::NoData) => {
+                    eprintln!("urania: no probe data in the selected period");
+                    3
+                }
+                Err(e) => {
+                    eprintln!("urania: {e}");
+                    1
+                }
+            }
+        }
+        cli::Cmd::Once { target, probe_type } => {
+            once(&cfg, target.as_deref(), probe_type.as_deref()).await
+        }
+        cli::Cmd::Selftest => match selftest::run().await {
+            Ok(code) => code,
+            Err(e) => {
+                eprintln!("urania: {e}");
+                1
+            }
+        },
+    }
+}
+
+/// One probe round, table output, exit 0 = all ok / 1 = any failed.
+async fn once(cfg: &config::Config, target: Option<&str>, probe_type: Option<&str>) -> i32 {
+    let pt = match probe_type {
+        Some(s) => match s {
+            "dns" => Some(config::ProbeType::Dns),
+            "tcp" => Some(config::ProbeType::Tcp),
+            "http" => Some(config::ProbeType::Http),
+            "icmp" => Some(config::ProbeType::Icmp),
+            _ => {
+                eprintln!("urania: --type must be dns | tcp | http | icmp");
+                return 1;
+            }
+        },
+        None => None,
+    };
+    let selected: Vec<&config::Target> = cfg
+        .targets
+        .iter()
+        .filter(|t| target.is_none_or(|n| t.name == n) && pt.is_none_or(|p| t.probe_type == p))
+        .collect();
+    if selected.is_empty() {
+        eprintln!("urania: no targets match the filter");
+        return 1;
+    }
+    let gateway_ip = if selected.iter().any(|t| t.is_gateway()) {
+        daemon::detect_gateway()
+    } else {
+        None
+    };
+    let probes: Vec<Arc<dyn probe::Probe>> = selected
+        .iter()
+        .filter_map(|t| probe::build_probe(t, &gateway_ip))
+        .collect();
+    if probes.is_empty() {
+        eprintln!("urania: no valid targets (gateway auto-detect failed?)");
+        return 1;
+    }
+    let results = probe::run_round(&probes).await;
+    println!(
+        "{:<18} {:<6} {:<7} {:>9}  DETAIL",
+        "TARGET", "TYPE", "RESULT", "LATENCY"
+    );
+    let mut any_fail = false;
+    for r in &results {
+        if !r.ok {
+            any_fail = true;
+        }
+        let lat = r
+            .latency_ms
+            .map(|l| format!("{l:.1}ms"))
+            .unwrap_or_else(|| "-".into());
+        println!(
+            "{:<18} {:<6} {:<7} {:>9}  {}",
+            r.target,
+            r.probe_type,
+            if r.ok { "ok" } else { "FAIL" },
+            lat,
+            r.detail
+        );
+    }
+    if any_fail { 1 } else { 0 }
+}

@@ -1,0 +1,17 @@
+[Unit]
+Description=urania network evidence logger
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/bin/urania run --foreground
+DynamicUser=true
+StateDirectory=urania
+Restart=on-failure
+RestartSec=5
+# No open ports, no capabilities required: default probes are plain
+# TCP/HTTP/DNS. If `urania status` cannot read the db under DynamicUser,
+# use `systemctl status urania` instead (documented in README FAQ).
+
+[Install]
+WantedBy=multi-user.target
