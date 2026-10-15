@@ -51,11 +51,14 @@ sudo systemctl enable --now urania
 
 ```
 docker build -t urania .
-docker run -d --name urania urania
+docker run -d --name urania \
+  -v urania-data:/root/.local/share/urania urania
 ```
 
-The container's resolver (`/etc/resolv.conf`) is the DNS measurement target;
-the report header records the resolver provenance.
+The image is a scratch container with one fully static musl binary (built
+for the host architecture; for other arches use the GitHub Releases
+binaries). The database lives in the mounted volume; `docker exec urania
+report --since 24h` writes the report into the container's working directory.
 
 ## Usage
 
@@ -122,15 +125,15 @@ example.com over TCP/53), TCP 1.1.1.1:443, HTTP gstatic + cloudflare, gateway
 - **ICMP permissions.** Linux needs root or CAP_NET_RAW; macOS usually works
   without prompts. Without permission the daemon logs a warning and skips ICMP
   targets — everything else runs.
-- **Docker resolver.** The container's `/etc/resolv.conf` is what the dns
-  probe measures; the report header records the resolver so the evidence
-  states what was measured.
+- **Which resolver is measured?** The dns probe queries the resolver IP from
+  the target config (default `1.1.1.1`), not the system resolver; each probe
+  row records its resolver so the evidence states what was measured.
 - **Clock.** Each probe stores wall time + the monotonic delta since the
   previous probe; the report flags probes whose delta deviates >10% from the
   expected interval (possible clock adjustment). The NTP state is recorded
   best-effort in the header.
 - **`start` succeeded but `status` says not running.** Check the log in the
-  data dir (rolling, 5 MB, keep 2).
+  data dir (daily rotation, keep 2).
 - **systemd DynamicUser.** The db is owned by the dynamic user; if `urania
   status` can't read it, use `systemctl status urania`.
 

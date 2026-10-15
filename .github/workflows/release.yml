@@ -30,7 +30,9 @@ jobs:
         run: |
           tar czf urania-${{ github.ref_name }}-${{ matrix.target }}.tar.gz \
             -C target/${{ matrix.target }}/release urania
-          (cd target/${{ matrix.target }}/release && sha256sum urania > urania.sha256)
+          # sha256sum is absent on macOS runners; fall back to shasum.
+          (cd target/${{ matrix.target }}/release \
+            && (sha256sum urania 2>/dev/null || shasum -a 256 urania) > urania.sha256)
       - uses: actions/upload-artifact@v4
         with:
           name: urania-${{ matrix.target }}

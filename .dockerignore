@@ -1,0 +1,6 @@
+.git
+target
+urania-report.html
+urania-report.csv
+urania-report.html.sha256
+*.log

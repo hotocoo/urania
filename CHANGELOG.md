@@ -16,7 +16,7 @@ All notable changes to urania are documented here.
 - Report: self-contained HTML (inline SVG sparklines, zero JavaScript, zero
   external requests), deterministic CSV, optional SHA-256 manifest.
 - Daemon: single-instance flock + pidfile (no stale-lock states), graceful
-  SIGTERM stop, rolling logs (5 MB, keep 2), `start|stop|status|once|report|selftest`.
+  SIGTERM stop, daily log rotation (keep 2), `start|stop|status|once|report|selftest`.
 - Deployment: systemd unit (dynamic user), Dockerfile (scratch + static musl
   binary), GitHub Actions CI (fmt + clippy + test, ubuntu + macOS) and
   release matrix (4 static binaries + SHA-256 checksums).
