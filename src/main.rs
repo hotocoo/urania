@@ -68,14 +68,42 @@ async fn run(cli: cli::Cli) -> i32 {
         cli::Cmd::Status { check } => daemon::status(&cfg, *check),
         cli::Cmd::Report {
             since,
+            from,
+            end,
             to,
             csv,
             manifest,
         } => {
+            // Absolute incident window (--from [--end]) wins over --since.
+            if from.is_none() && end.is_some() {
+                eprintln!("urania: --end requires --from");
+                return 1;
+            }
+            let window = match from.as_deref() {
+                Some(f) => {
+                    let f = util::parse_iso(f).unwrap_or_else(|| {
+                        eprintln!("urania: --from must be RFC3339, e.g. 2026-10-15T08:00:00+08:00");
+                        std::process::exit(1);
+                    });
+                    let t = match end.as_deref() {
+                        Some(e) => util::parse_iso(e).unwrap_or_else(|| {
+                            eprintln!("urania: --end must be RFC3339");
+                            std::process::exit(1);
+                        }),
+                        None => util::now_ms(),
+                    };
+                    if t <= f {
+                        eprintln!("urania: --end must be after --from");
+                        return 1;
+                    }
+                    Some((f, t))
+                }
+                None => None,
+            };
             let period = match report::Period::parse(since) {
                 Some(p) => p,
                 None => {
-                    eprintln!("urania: --since must be 24h | 7d | 30d | 90d");
+                    eprintln!("urania: --since must be 1h | 24h | 7d | 30d | 90d");
                     return 1;
                 }
             };
@@ -84,6 +112,7 @@ async fn run(cli: cli::Cli) -> i32 {
                 .unwrap_or_else(|| std::path::PathBuf::from("urania-report.html"));
             let opts = report::ReportOpts {
                 since: period,
+                window,
                 out_html,
                 out_csv: csv.clone(),
                 manifest: *manifest,

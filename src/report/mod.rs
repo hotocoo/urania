@@ -55,6 +55,8 @@ impl Period {
 #[derive(Debug, Clone)]
 pub struct ReportOpts {
     pub since: Period,
+    /// Absolute window (from_ms, to_ms); wins over `since` when set.
+    pub window: Option<(i64, i64)>,
     pub out_html: PathBuf,
     pub out_csv: Option<PathBuf>,
     pub manifest: bool,
@@ -183,8 +185,13 @@ pub fn render(
     store: &Store,
     opts: &ReportOpts,
 ) -> Result<RenderSummary, ReportError> {
-    let to = now_ms();
-    let from = to - opts.since.ms();
+    let (from, to) = match opts.window {
+        Some((f, t)) => (f, t),
+        None => {
+            let t = now_ms();
+            (t - opts.since.ms(), t)
+        }
+    };
     let rows = store.probes_in(from, to)?;
     if rows.is_empty() {
         return Err(ReportError::NoData);
@@ -228,7 +235,11 @@ pub fn render(
         CtxMeta {
             from_ms: from,
             to_ms: to,
-            period_label: opts.since.label(),
+            period_label: opts
+                .window
+                .is_some()
+                .then_some("absolute window")
+                .unwrap_or_else(|| opts.since.label()),
             manifest_name,
             build_hash: crate::version::hash(),
         },

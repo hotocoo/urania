@@ -72,6 +72,8 @@ urania once --type tcp  # only TCP targets
 urania once --json      # machine-readable output for scripts
 urania report --since 24h --to report.html
 urania report --since 30d --to report.html --csv report.csv --manifest
+urania report --from 2026-10-15T08:00:00+08:00 --end 2026-10-15T14:00:00+08:00
+                          # absolute incident window (RFC3339; --end defaults to now)
 urania verify report.html   # check the report against report.html.sha256
 urania config           # show the effective config (file + resolved paths + targets)
 urania selftest         # round-trip check against known-good targets

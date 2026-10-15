@@ -81,6 +81,9 @@ All notable changes to urania are documented here.
 - Report: per-target latency line gains p50 / p95 / p99
   (nearest-rank over successful probes) — "normal" vs
   "incident" latency in one line.
+- CLI: `report --from <RFC3339> [--end <RFC3339>]` — render an
+  absolute incident window instead of a trailing period (the
+  report header labels it "absolute window").
 - Config: fail-fast validation for an empty target list, whitespace-only
   target names, and ICMP endpoints containing whitespace (previously
   accepted, then logged silence or failed obscurely at probe time).
