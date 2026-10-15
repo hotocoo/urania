@@ -198,7 +198,7 @@ pub fn render_html(ctx: &HtmlCtx) -> String {
 
     // Period summary — the 10-second read for a ticket reviewer
     s.push_str("<section>\n<h2>Period summary</h2>\n");
-    s.push_str("<table>\n<tr><th>Target</th><th>Probes</th><th>OK</th><th>Failed</th><th>Availability</th><th>Outages</th></tr>\n");
+    s.push_str("<table>\n<tr><th>Target</th><th>Probes</th><th>OK</th><th>Failed</th><th>Availability</th><th>Outages</th><th>Coverage</th></tr>\n");
     for (info, td) in ctx.targets.iter().zip(ctx.data.iter()) {
         let ok = td.rows.iter().filter(|r| r.ok).count();
         let failed = td.rows.len() - ok;
@@ -210,14 +210,26 @@ pub fn render_html(ctx: &HtmlCtx) -> String {
             format!("{:.2}%", availability_pct(&td.rows))
         };
         let outages = ctx.outages.iter().filter(|w| w.target == td.name).count();
+        // Coverage: probes recorded vs expected for the period. Gaps mean
+        // the logger was not running (sleep, suspend, stop) — stated
+        // honestly instead of discovered by the reader.
+        let expected = (ctx.to_ms - ctx.from_ms) / (info.interval as i64 * 1000);
+        let coverage = if td.rows.is_empty() || expected <= 0 {
+            "—".to_string()
+        } else {
+            let pct = (td.rows.len() as f64 / expected as f64 * 100.0).min(100.0);
+            format!("{}/{expected} ({pct:.1}%)", td.rows.len())
+        };
         s.push_str(&format!(
-            "<tr><td>{} <code>{}</code></td><td>{}</td><td>{ok}</td><td>{failed}</td><td>{avail}</td><td>{outages}</td></tr>\n",
+            "<tr><td>{} <code>{}</code></td><td>{}</td><td>{ok}</td><td>{failed}</td><td>{avail}</td><td>{outages}</td><td>{coverage}</td></tr>\n",
             esc(&td.name),
             esc(&target_line(info)),
             td.rows.len()
         ));
     }
-    s.push_str("</table>\n</section>\n");
+    s.push_str("</table>\n");
+    s.push_str("<p>Coverage = probes recorded ÷ expected for the period (interval × period length). Below 100% means the logger was not running for part of the period (sleep, suspend, stop).</p>\n");
+    s.push_str("</section>\n");
 
     // Per-target sections
     for (info, td) in ctx.targets.iter().zip(ctx.data.iter()) {
@@ -458,7 +470,8 @@ mod tests {
             .expect("summary row");
         assert!(row_line.contains("80.00%"));
         assert!(row_line.contains("<td>10</td><td>8</td><td>2</td>"));
-        assert!(row_line.ends_with("<td>1</td></tr>"));
+        // 10 probes over 100 s at a 5 s interval → 20 expected
+        assert!(row_line.ends_with("<td>1</td><td>10/20 (50.0%)</td></tr>"));
     }
 
     #[test]
@@ -490,6 +503,11 @@ mod tests {
             .find(|l| l.contains("gateway") && l.contains("<td>5</td>"))
             .expect("reference-only row");
         assert!(ref_only.contains("ref-only"));
-        assert!(!ref_only.contains("%</td>"));
+        assert!(
+            !ref_only.contains("%.00%</td>"),
+            "no availability % for reference-only"
+        );
+        // coverage is still shown: 5 probes over 100 s at 5 s → 5/20 (25.0%)
+        assert!(ref_only.contains("5/20 (25.0%)"));
     }
 }
