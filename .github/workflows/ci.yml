@@ -59,3 +59,18 @@ jobs:
         run: |
           ./target/x86_64-unknown-linux-musl/release/urania --version
           ./target/x86_64-unknown-linux-musl/release/urania selftest
+
+  # The Dockerfile is a documented deployment path; test it on every push.
+  # Builds on the runner arch (x86_64) and smoke-tests inside the scratch
+  # container: version, network selftest, and one real TLS probe.
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -q -t urania:ci .
+      - name: Smoke test in container
+        run: |
+          docker run --rm urania:ci --version
+          docker run --rm urania:ci selftest
+          docker run --rm urania:ci once --json --target tcp-cloudflare
