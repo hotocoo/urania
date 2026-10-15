@@ -280,8 +280,8 @@ async fn daemon_roundtrip_local_dummies() {
         .unwrap();
     let out = String::from_utf8_lossy(&once_json.stdout);
     assert!(once_json.status.success(), "once --json failed: {out}");
-    let oj: serde_json::Value =
-        serde_json::from_str(&out).unwrap_or_else(|e| panic!("once --json not valid JSON: {e}: {out}"));
+    let oj: serde_json::Value = serde_json::from_str(&out)
+        .unwrap_or_else(|e| panic!("once --json not valid JSON: {e}: {out}"));
     assert_eq!(oj["all_ok"], serde_json::json!(true));
     assert!(
         oj["results"]
