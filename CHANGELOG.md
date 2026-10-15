@@ -58,6 +58,9 @@ All notable changes to urania are documented here.
 - Test: the integration test now covers the full evidence loop —
   `report --manifest`, `verify` (exit 0 fresh, exit 1 tampered),
   `status --check` (0 running, 1 stopped), and `once --target`.
+- Provenance: the report header/footer, the db `tool_version` meta,
+  and `status`/`config` now record the exact build (version + git
+  commit, via build.rs; version alone when built without git).
 - Daemon: single-instance flock + pidfile (no stale-lock states), graceful
   SIGTERM stop, daily log rotation (keep 2), `start|stop|status|once|report|verify|config|selftest`;
   `start` polls for the pidfile up to 5 s instead of one fixed 500 ms wait,
