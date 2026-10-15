@@ -126,6 +126,10 @@ All notable changes to urania are documented here.
 - CLI: `status --json` open outages now include
   `duration_s` (the text form always showed the elapsed
   time; the JSON form was missing it).
+- Docs: the prebuilt-binary install path now shows the
+  verify-first workflow (sha256sum -c, extract, install,
+  selftest / selftest --offline) — an evidence tool you
+  cannot authenticize is an evidence tool you cannot trust.
 - Config: fail-fast validation for an empty target list, whitespace-only
   target names, and ICMP endpoints containing whitespace (previously
   accepted, then logged silence or failed obscurely at probe time).
