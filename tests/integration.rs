@@ -139,6 +139,35 @@ async fn daemon_roundtrip_local_dummies() {
             .any(|t| t["name"] == "tcp-local" && t["last"]["ok"].is_boolean()),
         "tcp-local target with last probe: {v}"
     );
+    // Default window keeps the stable JSON key avail_1h_pct.
+    assert!(
+        v["targets"].as_array().unwrap()[0]
+            .get("avail_1h_pct")
+            .is_some(),
+        "default status --json must expose avail_1h_pct: {v}"
+    );
+
+    // status --since 24h: the availability key tracks the requested window.
+    let st_24 = std::process::Command::new(bin)
+        .args(["status", "--since", "24h", "--json", "--config"])
+        .arg(&cfg_path)
+        .output()
+        .unwrap();
+    assert!(
+        st_24.status.success(),
+        "status --since 24h --json should exit 0: {}",
+        String::from_utf8_lossy(&st_24.stderr)
+    );
+    let v24: serde_json::Value = serde_json::from_slice(&st_24.stdout).unwrap();
+    let t24 = &v24["targets"].as_array().unwrap()[0];
+    assert!(
+        t24.get("avail_24h_pct").is_some(),
+        "--since 24h must expose avail_24h_pct: {v24}"
+    );
+    assert!(
+        t24.get("avail_1h_pct").is_none(),
+        "--since 24h must not also expose avail_1h_pct: {v24}"
+    );
 
     // SIGTERM → graceful stop.
     unsafe {

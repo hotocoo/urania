@@ -65,7 +65,22 @@ async fn run(cli: cli::Cli) -> i32 {
             }
         }
         cli::Cmd::Stop => daemon::stop(&cfg),
-        cli::Cmd::Status { check, json } => daemon::status(&cfg, *check, *json),
+        cli::Cmd::Status { check, json, since } => {
+            // Availability window for the at-a-glance per-target numbers.
+            // Default 1h keeps the existing output (and the JSON key
+            // avail_1h_pct) exactly.
+            let (label, window_ms) = match since.as_deref() {
+                None => ("1h".to_string(), 3_600_000),
+                Some(s) => match report::Period::parse(s) {
+                    Some(p) => (p.label().to_string(), p.ms()),
+                    None => {
+                        eprintln!("urania: --since must be one of 1h 24h 7d 30d 90d");
+                        return 1;
+                    }
+                },
+            };
+            daemon::status(&cfg, *check, *json, &label, window_ms)
+        }
         cli::Cmd::Report {
             since,
             from,

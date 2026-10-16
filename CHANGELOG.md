@@ -170,6 +170,12 @@ All notable changes to urania are documented here.
   "missing" and pass silently — verifying nothing. Now the
   downloaded tarball is actually checked, and a tampered
   file still fails.
+- CLI: `status --since 1h|24h|7d|30d|90d` — the per-target
+  availability now covers the requested window instead of
+  always 1h, for a quick health check over a longer period
+  without generating a full report. The default is 1h, so
+  existing output and the JSON key `avail_1h_pct` are
+  unchanged; `--since 7d` exposes `avail_7d_pct`.
 - Config: fail-fast validation for an empty target list, whitespace-only
   target names, and ICMP endpoints containing whitespace (previously
   accepted, then logged silence or failed obscurely at probe time).

@@ -172,7 +172,9 @@ pub fn stop(cfg: &Config) -> i32 {
 
 /// Status: daemon, db, lock, per-target last probe, open outages.
 /// Degrades gracefully when the db is unreadable (roadmap T4).
-pub fn status(cfg: &Config, check: bool, json: bool) -> i32 {
+/// `avail_label`/`window_ms` set the per-target availability window
+/// (default 1h, so the output and the JSON key are unchanged).
+pub fn status(cfg: &Config, check: bool, json: bool, avail_label: &str, window_ms: i64) -> i32 {
     let lock_path = config::lock_path(cfg);
     let running_pid = lock::peek(&lock_path);
     if check {
@@ -186,7 +188,7 @@ pub fn status(cfg: &Config, check: bool, json: bool) -> i32 {
         };
     }
     if json {
-        return status_json(cfg, &lock_path, running_pid);
+        return status_json(cfg, &lock_path, running_pid, avail_label, window_ms);
     }
     println!("urania v{}", crate::version::full());
     let db_path = config::db_path(cfg);
@@ -239,19 +241,25 @@ pub fn status(cfg: &Config, check: bool, json: bool) -> i32 {
                 }
             );
             println!("  targets:");
-            let hour_ago = now_ms().saturating_sub(3_600_000);
+            let window_start = now_ms().saturating_sub(window_ms);
             for t in &cfg.targets {
-                // Availability over the last hour: the at-a-glance health
-                // check. Reference-only gateways show no percentage —
-                // silence is their baseline state, not a failure.
+                // Availability over the requested window: the at-a-glance
+                // health check. Reference-only gateways show no percentage
+                // — silence is their baseline state, not a failure.
                 let avail = if t.is_gateway() && !store.ever_ok(&t.name).unwrap_or(true) {
                     "ref-only".to_string()
                 } else {
-                    match store.probe_counts_since(&t.name, hour_ago).unwrap_or(None) {
+                    match store
+                        .probe_counts_since(&t.name, window_start)
+                        .unwrap_or(None)
+                    {
                         Some((ok, total)) if total > 0 => {
-                            format!("avail(1h) {:.1}%", ok as f64 / total as f64 * 100.0)
+                            format!(
+                                "avail({avail_label}) {:.1}%",
+                                ok as f64 / total as f64 * 100.0
+                            )
                         }
-                        _ => "no data(1h)".to_string(),
+                        _ => format!("no data({avail_label})"),
                     }
                 };
                 match store.last_probe(&t.name) {
@@ -310,8 +318,15 @@ pub fn status(cfg: &Config, check: bool, json: bool) -> i32 {
 }
 
 /// Machine-readable status for monitoring. Exit 0 = running, 1 = not
-/// running (the text form is human-facing and always exits 0).
-fn status_json(cfg: &Config, lock_path: &std::path::Path, running_pid: Option<u32>) -> i32 {
+/// running (the text form is human-facing and always exits 0). The
+/// availability key is `avail_<window>_pct` (default `avail_1h_pct`).
+fn status_json(
+    cfg: &Config,
+    lock_path: &std::path::Path,
+    running_pid: Option<u32>,
+    avail_label: &str,
+    window_ms: i64,
+) -> i32 {
     use serde_json::json;
     let db_path = config::db_path(cfg);
     let mut v = json!({
@@ -344,7 +359,8 @@ fn status_json(cfg: &Config, lock_path: &std::path::Path, running_pid: Option<u3
             "rows": rows,
             "retention_days": cfg.retention_days,
         });
-        let hour_ago = now_ms().saturating_sub(3_600_000);
+        let window_start = now_ms().saturating_sub(window_ms);
+        let avail_key = format!("avail_{avail_label}_pct");
         let mut targets = Vec::new();
         for t in &cfg.targets {
             let ref_only = t.is_gateway() && !store.ever_ok(&t.name).unwrap_or(true);
@@ -352,7 +368,7 @@ fn status_json(cfg: &Config, lock_path: &std::path::Path, running_pid: Option<u3
                 None
             } else {
                 store
-                    .probe_counts_since(&t.name, hour_ago)
+                    .probe_counts_since(&t.name, window_start)
                     .ok()
                     .flatten()
                     .filter(|(_, total)| *total > 0)
@@ -363,13 +379,14 @@ fn status_json(cfg: &Config, lock_path: &std::path::Path, running_pid: Option<u3
                 .ok()
                 .flatten()
                 .map(|r| json!({ "ts": r.ts, "ok": r.ok, "latency_ms": r.latency_ms }));
-            targets.push(json!({
+            let mut obj = json!({
                 "name": t.name,
                 "type": t.probe_type.to_string(),
                 "last": last,
-                "avail_1h_pct": avail,
                 "ref_only": ref_only,
-            }));
+            });
+            obj[avail_key.as_str()] = json!(avail);
+            targets.push(obj);
         }
         v["targets"] = json!(targets);
         if let Ok(open) = store.open_windows() {

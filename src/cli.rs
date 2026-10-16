@@ -37,6 +37,10 @@ pub enum Cmd {
         /// Machine-readable JSON (exit 0 = running, 1 = not running)
         #[arg(long)]
         json: bool,
+        /// Availability window: 1h | 24h | 7d | 30d | 90d (default 1h;
+        /// the JSON key becomes avail_<window>_pct)
+        #[arg(long)]
+        since: Option<String>,
     },
     /// Render the evidence report (self-contained HTML, optional CSV + SHA-256 manifest)
     Report {
