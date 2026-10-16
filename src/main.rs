@@ -87,6 +87,7 @@ async fn run(cli: cli::Cli) -> i32 {
             end,
             to,
             csv,
+            outages_csv,
             manifest,
             stdout,
             title,
@@ -139,6 +140,7 @@ async fn run(cli: cli::Cli) -> i32 {
                 window,
                 out_html,
                 out_csv: csv.clone(),
+                outages_csv: outages_csv.clone(),
                 manifest: *manifest,
                 stdout: *stdout,
                 title: title.clone(),
@@ -172,6 +174,9 @@ async fn run(cli: cli::Cli) -> i32 {
                         );
                         if let Some(c) = &summary.csv {
                             println!("csv:      {}", c.display());
+                        }
+                        if let Some(c) = &summary.outages_csv {
+                            println!("outages:  {}", c.display());
                         }
                         if let Some(m) = &summary.manifest {
                             println!("manifest: {}", m.display());

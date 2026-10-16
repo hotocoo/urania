@@ -61,13 +61,18 @@ pub enum Cmd {
         /// Also write CSV to this path
         #[arg(long)]
         csv: Option<PathBuf>,
+        /// Also write the outage-window summary as CSV to this path
+        /// (start/end/duration/target/layers/cause) — for an ISP dispute,
+        /// attach this instead of the full per-probe CSV
+        #[arg(long)]
+        outages_csv: Option<PathBuf>,
         /// Write a SHA-256 manifest alongside the outputs
         #[arg(long)]
         manifest: bool,
         /// Print the HTML to stdout instead of a file (CI log
         /// attachments); the evidence chain (--csv/--manifest) needs
         /// files on disk, so clap rejects the combination
-        #[arg(long, conflicts_with_all = ["csv", "manifest"])]
+        #[arg(long, conflicts_with_all = ["csv", "outages_csv", "manifest"])]
         stdout: bool,
         /// Custom report title (e.g. an incident label) shown in the
         /// header; the period is always shown separately

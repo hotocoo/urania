@@ -176,6 +176,13 @@ All notable changes to urania are documented here.
   without generating a full report. The default is 1h, so
   existing output and the JSON key `avail_1h_pct` are
   unchanged; `--since 7d` exposes `avail_7d_pct`.
+- CLI: `report --outages-csv <path>` — writes the
+  outage-window summary (start/end/duration/target/layers/
+  cause/location/flap) as a separate CSV, the attachable
+  incident summary for an ISP dispute instead of the full
+  per-probe CSV. An empty body (header only) is meaningful:
+  it proves there were no outages in the period. Covered by
+  the `--manifest` SHA-256 chain.
 - Config: fail-fast validation for an empty target list, whitespace-only
   target names, and ICMP endpoints containing whitespace (previously
   accepted, then logged silence or failed obscurely at probe time).

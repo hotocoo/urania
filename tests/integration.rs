@@ -191,11 +191,14 @@ async fn daemon_roundtrip_local_dummies() {
     // Report over the collected data, with a SHA-256 manifest.
     let out_html = dir.join("report.html");
     let out_csv = dir.join("report.csv");
+    let out_outages = dir.join("report-outages.csv");
     let rep = std::process::Command::new(bin)
         .args(["report", "--since", "24h", "--to"])
         .arg(&out_html)
         .arg("--csv")
         .arg(&out_csv)
+        .arg("--outages-csv")
+        .arg(&out_outages)
         .arg("--manifest")
         .arg("--config")
         .arg(&cfg_path)
@@ -212,8 +215,22 @@ async fn daemon_roundtrip_local_dummies() {
     assert!(html.contains("http-local"));
     let csv_text = std::fs::read_to_string(&out_csv).unwrap();
     assert!(csv_text.lines().count() > 3, "csv too small: {csv_text}");
+    // Outage-window summary: header always present (an empty body is
+    // meaningful — it proves no outages in the period).
+    let outages_text = std::fs::read_to_string(&out_outages).unwrap();
+    assert!(
+        outages_text
+            .starts_with("start_iso,end_iso,duration_s,target,layers,cause,location_class,flap"),
+        "outages csv header: {outages_text}"
+    );
     let manifest = dir.join("report.html.sha256");
     assert!(manifest.exists(), "manifest not written");
+    // The manifest now covers the outages CSV too.
+    let manifest_text = std::fs::read_to_string(&manifest).unwrap();
+    assert!(
+        manifest_text.contains("report-outages.csv"),
+        "manifest must cover the outages csv: {manifest_text}"
+    );
 
     // Evidence integrity: verify passes on the fresh report...
     let ver = std::process::Command::new(bin)

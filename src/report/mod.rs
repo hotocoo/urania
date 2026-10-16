@@ -59,6 +59,10 @@ pub struct ReportOpts {
     pub window: Option<(i64, i64)>,
     pub out_html: PathBuf,
     pub out_csv: Option<PathBuf>,
+    /// Outage-window summary CSV path (start/end/duration/target/layers/
+    /// cause) — the attachable incident summary, distinct from the
+    /// per-probe CSV.
+    pub outages_csv: Option<PathBuf>,
     pub manifest: bool,
     /// Print the HTML to stdout instead of writing out_html.
     pub stdout: bool,
@@ -70,6 +74,7 @@ pub struct ReportOpts {
 pub struct RenderSummary {
     pub html: PathBuf,
     pub csv: Option<PathBuf>,
+    pub outages_csv: Option<PathBuf>,
     pub manifest: Option<PathBuf>,
     pub probes: usize,
     pub outages: usize,
@@ -235,6 +240,15 @@ pub fn render(
         csv::write_csv(p, &rows)?;
         csv_path = Some(p.clone());
     }
+    // The outage-window summary, written before build_ctx_fetched takes
+    // ownership of `outages`. An empty file (header only) is meaningful:
+    // it proves there were no outages in the period.
+    let mut outages_csv_path = None;
+    if let Some(p) = &opts.outages_csv {
+        write_parent(p)?;
+        csv::write_outages_csv(p, &outages)?;
+        outages_csv_path = Some(p.clone());
+    }
 
     let ctx = build_ctx_fetched(
         cfg,
@@ -267,6 +281,9 @@ pub fn render(
         if let Some(c) = &csv_path {
             files.push(c.clone());
         }
+        if let Some(c) = &outages_csv_path {
+            files.push(c.clone());
+        }
         let mp = manifest::write_manifest(&files)?;
         manifest_path = Some(mp);
     }
@@ -274,6 +291,7 @@ pub fn render(
     Ok(RenderSummary {
         html: opts.out_html.clone(),
         csv: csv_path,
+        outages_csv: outages_csv_path,
         manifest: manifest_path,
         probes: probe_count,
         outages: outage_count,

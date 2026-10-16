@@ -91,6 +91,7 @@ urania status           # daemon, db, per-target last probe + 1h availability, o
 urania status --check   # scripts: print state, exit 0 = running, 1 = not running
 urania status --json    # machine-readable status for monitoring (same exit codes)
 urania status --since 7d  # availability over 1h|24h|7d|30d|90d (JSON: avail_7d_pct)
+urania report --outages-csv outages.csv  # outage-window summary (attach to an ISP dispute)
 urania once             # one probe round, table output, exit 0/1
 urania once --type tcp  # only TCP targets
 urania once --json      # machine-readable output for scripts
