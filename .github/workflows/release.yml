@@ -24,6 +24,12 @@ jobs:
       - name: Install musl target
         if: contains(matrix.target, 'musl')
         run: rustup target add ${{ matrix.target }}
+      # macos-latest is arm64: the x86_64 leg cross-compiles (Apple's
+      # toolchain + SDK are universal, so installing the target is enough).
+      # Both targets are added so the legs survive a runner-arch flip.
+      - name: Install darwin targets
+        if: contains(matrix.target, 'darwin')
+        run: rustup target add x86_64-apple-darwin aarch64-apple-darwin
       # zigbuild provides the C cross-compiler + linker for both musl
       # targets (the bundled SQLite C source needs one; a plain
       # `cargo build` cannot cross to aarch64-musl on an x86_64 runner).
