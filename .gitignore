@@ -4,3 +4,5 @@
 urania-report.html
 urania-report.csv
 urania-report.html.sha256
+# local demo working area (real probe data, not for the public repo)
+demo/

@@ -11,6 +11,7 @@ mod store;
 mod util;
 mod version;
 
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use clap::Parser;
@@ -328,6 +329,9 @@ async fn run(cli: cli::Cli) -> i32 {
 }
 
 /// One probe round, table output, exit 0 = all ok / 1 = any failed.
+/// A gateway that has never responded in history is a reference probe: its
+/// baseline silence is marked `ref` and does not fail the round (same rule
+/// as the daemon detector, status, and restart recovery).
 /// `quiet`: silent on success (exit code only); failures still print.
 async fn once(
     cfg: &config::Config,
@@ -372,9 +376,10 @@ async fn once(
         return 1;
     }
     let results = probe::run_round(&probes).await;
+    let ref_only = ref_only_gateways(cfg, &selected);
     let mut any_fail = false;
     for r in &results {
-        if !r.ok {
+        if !r.ok && !ref_only.contains(&r.target) {
             any_fail = true;
         }
     }
@@ -402,6 +407,9 @@ async fn once(
                     if !r.detail.is_empty() {
                         o["detail"] = serde_json::json!(r.detail);
                     }
+                    if ref_only.contains(&r.target) {
+                        o["ref_only"] = serde_json::json!(true);
+                    }
                     o
                 })
                 .collect();
@@ -423,7 +431,13 @@ async fn once(
                     "{:<18} {:<6} {:<7} {:>9}  {}",
                     r.target,
                     r.probe_type,
-                    if r.ok { "ok" } else { "FAIL" },
+                    if r.ok {
+                        "ok"
+                    } else if ref_only.contains(&r.target) {
+                        "ref"
+                    } else {
+                        "FAIL"
+                    },
                     lat,
                     r.detail
                 );
@@ -431,4 +445,91 @@ async fn once(
         }
     }
     if any_fail { 1 } else { 0 }
+}
+
+/// Honest silence (same rule as the daemon detector, status, and restart
+/// recovery): gateway targets that have never responded in the full db
+/// history are reference probes — their silence is the baseline state, not
+/// a failure, so their probe failures must not fail the round. Fail-open:
+/// db missing or unreadable → empty set (every failure counts).
+fn ref_only_gateways(cfg: &config::Config, selected: &[&config::Target]) -> HashSet<String> {
+    let db = config::db_path(cfg);
+    if !db.exists() {
+        return HashSet::new();
+    }
+    let Ok(store) = store::Store::open(&db) else {
+        return HashSet::new();
+    };
+    selected
+        .iter()
+        .filter(|t| t.is_gateway() && !store.ever_ok(&t.name).unwrap_or(true))
+        .map(|t| t.name.clone())
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn gateway(name: &str) -> config::Target {
+        config::Target {
+            name: name.into(),
+            probe_type: config::ProbeType::Tcp,
+            endpoint: "auto:443,80".into(),
+            interval: 5,
+            timeout: 2,
+        }
+    }
+
+    fn gw_probe(ok: bool) -> probe::ProbeResult {
+        probe::ProbeResult {
+            ts_wall_ms: util::now_ms(),
+            ts_mono_delta_ms: 0,
+            target: "gateway".into(),
+            probe_type: config::ProbeType::Tcp,
+            ok,
+            latency_ms: None,
+            detail: if ok {
+                String::new()
+            } else {
+                "unreachable@192.0.2.1:80".into()
+            },
+        }
+    }
+
+    #[test]
+    fn ref_only_gateways_follows_history() {
+        let dir = std::env::temp_dir().join(format!("urania-once-refonly-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let cfg = config::Config {
+            fail_threshold: 3,
+            retention_days: 90,
+            db_path: dir.join("t.db").to_string_lossy().into_owned(),
+            log_path: String::new(),
+            icmp: false,
+            targets: vec![],
+        };
+        let gw = gateway("gateway");
+        let sel = [&gw];
+
+        // No db → fail-open: silence counts as a failure.
+        assert!(ref_only_gateways(&cfg, &sel).is_empty());
+
+        // History of only failures → reference probe: silence is baseline.
+        {
+            let mut s = store::Store::open(&config::db_path(&cfg)).unwrap();
+            s.insert_probes(&[gw_probe(false)]).unwrap();
+        }
+        assert!(ref_only_gateways(&cfg, &sel).contains("gateway"));
+
+        // One historical ok → responsive device: silence is a real signal.
+        {
+            let mut s = store::Store::open(&config::db_path(&cfg)).unwrap();
+            s.insert_probes(&[gw_probe(true)]).unwrap();
+        }
+        assert!(ref_only_gateways(&cfg, &sel).is_empty());
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }

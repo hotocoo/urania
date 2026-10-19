@@ -109,10 +109,12 @@ urania selftest         # round-trip check against known-good targets
 urania selftest --offline # no network: local TCP dummy (air-gapped installs)
 ```
 
-Exit codes: `once`/`selftest` 0 = all ok, 1 = any failure; `start` 2 =
-already running; `status --check` 1 = not running; `report` 3 = no data in
-period; `verify` 1 = hash mismatch or missing file, 2 = unreadable/malformed
-manifest.
+Exit codes: `once`/`selftest` 0 = all ok, 1 = any failure (a gateway that
+has never responded is a reference probe — its baseline silence is marked
+`ref` in the table and does not fail `once`; no db history = fail-open, it
+counts); `start` 2 = already running; `status --check` 1 = not running;
+`report` 3 = no data in period; `verify` 1 = hash mismatch or missing file,
+2 = unreadable/malformed manifest.
 
 ## The report
 

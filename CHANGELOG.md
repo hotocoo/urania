@@ -17,6 +17,9 @@ All notable changes to urania are documented here.
   reference-only gateway windows (cause `reference-only: …`). One live
   evidence DB was corrected on 2026-10-15 (false open gateway window closed
   with the reference-only cause).
+- CLI: `once` honors the same rule — a gateway with no historical success
+  prints `ref` (table) / `ref_only: true` (`--json`) and does not fail the
+  round; no db history = fail-open, every failure counts.
 - Detection: outage windows (backdated to first failure), per-layer cause
   attribution, flap detection, WiFi-vs-upstream location class.
 - Storage: SQLite (WAL, bundled C source → fully static), 90-day retention,
