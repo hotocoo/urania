@@ -48,4 +48,10 @@ before publishing. Performed 2026-10-15.
       drift flags were response-duration jitter, fixed in this release).
 - [ ] trademark search (before commercial distribution)
 - [x] repo (2026-10-15: `hotocoo/urania` created, `main` pushed, CI green)
-- [ ] first release (tag `v0.1.0` after the soak passes → 4 static binaries + SHA256SUMS via the release workflow)
+- [x] first release (2026-10-19: `v0.1.0` tagged at eef6562 → 4 static
+      binaries + SHA256SUMS; all 4 checksums re-verified from the published
+      assets, release-binary selftest PASS (darwin arm64), musl binary
+      `file`-confirmed statically linked, GHCR multi-arch image pushed and
+      smoke-tested in-container. One workflow fix along the way:
+      macos-latest is arm64, so the darwin legs need `rustup target add`
+      for the cross-arch build — eef6562.)
