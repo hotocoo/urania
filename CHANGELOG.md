@@ -2,7 +2,7 @@
 
 All notable changes to urania are documented here.
 
-## 0.1.0 (unreleased)
+## 0.1.0 (2026-10-19)
 
 - Initial release: headless, zero-permission network outage evidence logger.
 - Probes: DNS (hand-rolled A query over TCP/53, resolver recorded per probe),
