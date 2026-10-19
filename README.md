@@ -151,9 +151,11 @@ Every element of the chain is independently checkable by a recipient:
 - **Completeness** — the summary's Coverage column states probes recorded
   vs expected (interval × period) and Observed states first → last probe
   per target. Gaps (sleep, suspend, stop) are declared, not hidden.
-- **Clock honesty** — each probe stores wall time plus the monotonic
-  delta since the previous probe; the report flags probes whose delta
-  deviates >10% from the expected interval (possible clock adjustment).
+- **Clock honesty** — each probe stores wall time plus the monotonic delta
+  between consecutive probe starts (independent of probe duration — a slow
+  response is latency, not a clock anomaly); the report flags deltas that
+  deviate >10% from the expected interval (scheduler starvation, sleep, or
+  clock adjustment).
 - **Honest silence** — a gateway that has never answered TCP is a
   reference probe: its silence is recorded without an outage claim, and
   the report says so (`ref-only`).
@@ -201,10 +203,11 @@ claim (many home routers run no TCP 80/443 service).
 - **Which resolver is measured?** The dns probe queries the resolver IP from
   the target config (default `1.1.1.1`), not the system resolver; each probe
   row records its resolver so the evidence states what was measured.
-- **Clock.** Each probe stores wall time + the monotonic delta since the
-  previous probe; the report flags probes whose delta deviates >10% from the
-  expected interval (possible clock adjustment). The NTP state is recorded
-  best-effort in the header.
+- **Clock.** Each probe stores wall time + the monotonic delta between
+  consecutive probe starts (start-to-start, so probe duration cannot swing
+  it); the report flags deltas deviating >10% from the expected interval
+  (scheduler starvation, sleep, or clock adjustment). The NTP state is
+  recorded best-effort in the header.
 - **`start` succeeded but `status` says not running.** Check the log in the
   data dir (daily rotation, keep 2).
 - **More detail in the daemon log.** The log level follows `RUST_LOG`

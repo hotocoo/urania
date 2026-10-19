@@ -38,7 +38,14 @@ before publishing. Performed 2026-10-15.
 - [x] name free on crates.io
 - [x] wedge open (re-verified)
 - [x] icmp feature live-verified (2026-10-15: 9.0ms RTT to 1.1.1.1, unprivileged macOS)
-- [~] 24h soak (T7) — started 2026-10-15 21:19:55 +08 (pid 70840); automated verification scheduled 2026-10-16 21:35 +08 (DSH automation `urania 24h soak verification`)
+- [x] 24h soak (T7) — started 2026-10-15 21:19:55 +08 (pid 70840; replaced
+      after 7 min by pid 81779, running continuously since 21:26:38).
+      Verified 2026-10-19: 3d 11h, 300,600 probes, three full days at
+      exactly 86,400 rows/day (zero missed intervals), 5/6 targets at
+      99.9–100% availability, gateway reference-only as designed (never
+      answered TCP → no outage claimed; its single db window is the closed
+      `reference-only: …` correction), no true clock anomalies (the dns
+      drift flags were response-duration jitter, fixed in this release).
 - [ ] trademark search (before commercial distribution)
 - [x] repo (2026-10-15: `hotocoo/urania` created, `main` pushed, CI green)
 - [ ] first release (tag `v0.1.0` after the soak passes → 4 static binaries + SHA256SUMS via the release workflow)

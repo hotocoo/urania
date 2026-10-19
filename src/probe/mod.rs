@@ -20,7 +20,9 @@ use crate::util::now_ms;
 #[derive(Debug, Clone)]
 pub struct ProbeResult {
     pub ts_wall_ms: i64,
-    /// Milliseconds since the previous result for this target (0 in one-shot modes).
+    /// Milliseconds since the previous probe *start* for this target (0 in
+    /// one-shot modes). Start-to-start so probe duration cannot swing it:
+    /// a slow response is latency, not a clock anomaly.
     pub ts_mono_delta_ms: i64,
     pub target: String,
     pub probe_type: ProbeType,
@@ -145,12 +147,15 @@ pub fn spawn_scheduler(
                 let mut last: Option<Instant> = None;
                 loop {
                     tick.tick().await;
+                    // Delta between consecutive probe starts: isolates
+                    // scheduler/clock health from probe duration (a slow
+                    // response must not read as a clock anomaly).
+                    let start = Instant::now();
                     let mut res = p.run().await;
-                    let now = Instant::now();
                     res.ts_mono_delta_ms = last
-                        .map(|l| now.duration_since(l).as_millis() as i64)
+                        .map(|l| start.duration_since(l).as_millis() as i64)
                         .unwrap_or(0);
-                    last = Some(now);
+                    last = Some(start);
                     if tx.send(res).await.is_err() {
                         return; // receiver dropped: shutting down
                     }
@@ -158,4 +163,68 @@ pub fn spawn_scheduler(
             })
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Probe whose duration alternates 1ms / 700ms (70% of the 1s
+    /// interval) — enough jitter to swing an end-to-end delta by ±70%.
+    struct JitterProbe {
+        target: Target,
+        slow: std::sync::atomic::AtomicBool,
+    }
+
+    #[async_trait]
+    impl Probe for JitterProbe {
+        fn target(&self) -> &Target {
+            &self.target
+        }
+        async fn run(&self) -> ProbeResult {
+            use std::sync::atomic::Ordering;
+            let was_slow = self.slow.load(Ordering::Relaxed);
+            self.slow.store(!was_slow, Ordering::Relaxed);
+            let ms = if was_slow { 700 } else { 1 };
+            tokio::time::sleep(Duration::from_millis(ms)).await;
+            result(&self.target, true, Some(ms as f64), "")
+        }
+    }
+
+    /// Start-to-start deltas must not swing with probe duration: an
+    /// end-to-end measurement would read 301/1699ms here (±70%), tripping
+    /// the report's >10% drift flag on every slow response.
+    #[tokio::test]
+    async fn scheduler_delta_is_start_to_start_not_duration() {
+        let target = Target {
+            name: "jitter".into(),
+            probe_type: ProbeType::Tcp,
+            endpoint: "127.0.0.1:1".into(),
+            interval: 1,
+            timeout: 5,
+        };
+        let probe = Arc::new(JitterProbe {
+            target,
+            slow: std::sync::atomic::AtomicBool::new(false),
+        });
+        let (tx, mut rx) = tokio::sync::mpsc::channel(16);
+        let _h = spawn_scheduler(vec![probe], tx);
+        let mut deltas: Vec<(i64, Option<f64>)> = Vec::new();
+        for _ in 0..4 {
+            let r = rx.recv().await.unwrap();
+            deltas.push((r.ts_mono_delta_ms, r.latency_ms));
+        }
+        drop(rx); // stop the scheduler
+        assert_eq!(deltas[0].0, 0, "first probe has no previous start");
+        // The slow probes really ran slow (the test is not vacuous)…
+        assert!(deltas.iter().any(|(_, l)| l.is_some_and(|v| v > 500.0)));
+        // …and no start-to-start delta swung with the duration: all within
+        // 1s ± 200ms.
+        for (d, _) in &deltas[1..] {
+            assert!(
+                (d - 1000).abs() <= 200,
+                "delta {d}ms off the 1000ms interval"
+            );
+        }
+    }
 }

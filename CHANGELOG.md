@@ -20,6 +20,12 @@ All notable changes to urania are documented here.
 - CLI: `once` honors the same rule — a gateway with no historical success
   prints `ref` (table) / `ref_only: true` (`--json`) and does not fail the
   round; no db history = fail-open, every failure counts.
+- Clock honesty: `ts_mono_delta_ms` now measures between consecutive probe
+  *starts* (was: probe ends), so a slow-but-successful response no longer
+  swings the delta and no longer trips the report's >10% drift flag — the
+  flag now reflects scheduler/clock health only. Found via the 24h soak:
+  dns-cloudflare showed a 6.4% false-positive drift rate from 1.1.1.1
+  response duration (0.5–3.6s), not clock instability.
 - Detection: outage windows (backdated to first failure), per-layer cause
   attribution, flap detection, WiFi-vs-upstream location class.
 - Storage: SQLite (WAL, bundled C source → fully static), 90-day retention,
